@@ -1,0 +1,141 @@
+# antfarm-001 --- PLAN.md (Phase 1 Build Plan)
+
+This file defines the actionable implementation plan for Phase 1 of the
+ant farm game.\
+It follows the Build Whenever workflow: `/specify → /plan → /tasks`.
+
+------------------------------------------------------------------------
+
+# 1. High-Level Goal
+
+Create a **fully client-side ant farm simulator** running in a Farcaster
+mini app, where: - The simulation uses a pure JavaScript/TypeScript
+core. - Rendering is done via a `<canvas>`. - Users can add food, water,
+dirt, and reset the colony. - Ants move, dig, carry dirt, follow
+pheromones, and display simple autonomous behaviors. - Save/load works
+via `localStorage`.
+
+Phase 1 will **not** include backend simulation, always-on logic, or
+AI-driven colony behavior.
+
+------------------------------------------------------------------------
+
+# 2. Technical Architecture Overview
+
+### **Frontend Framework**
+
+-   Next.js (via the existing Farcaster mini-app template repo).
+-   Canvas rendering (`CanvasRenderingContext2D`).
+-   React components for controls and layout.
+
+### **Simulation Architecture**
+
+-   Pure functions in `/sim` directory:
+    -   `simulateStep()`\
+    -   `updateAnts()`, `applyPheromones()`, `updateDirtParticles()`,
+        etc.
+-   `gameState` object updated every animation frame.
+-   Renderer in `/render/renderer.ts`.
+
+### **Persistence**
+
+-   `localStorage` snapshot every 3--5 seconds or on unmount.
+
+------------------------------------------------------------------------
+
+# 3. Directory Layout (Final Expected)
+
+    /src
+      /sim
+        gameState.ts
+        simulateStep.ts
+        ants.ts
+        world.ts
+        pheromones.ts
+      /render
+        renderer.ts
+      /ui
+        AntFarmCanvas.tsx
+        ControlsPanel.tsx
+      pages/ or app/
+        page.tsx (or index.tsx)
+
+------------------------------------------------------------------------
+
+# 4. Implementation Milestones (PR-Level)
+
+## **PR-001 --- Repo Setup & Shell**
+
+**Goal:** Create a fresh working ant farm mini app scaffold.
+
+Tasks: - Duplicate existing Farcaster mini-app template. - Rename
+project to `antfarm-001`. - Replace template UI with: -
+`<AntFarmCanvas />` - `<ControlsPanel />` - Deploy to Vercel and
+confirm: - Loads correctly in browser. - Loads in Farcaster mini app
+preview.
+
+Output: - Skeleton project running with empty canvas + UI bar.
+
+------------------------------------------------------------------------
+
+## **PR-002 --- GameState & Random Movement**
+
+**Goal:** Implement `GameState` and basic ant movement.
+
+Tasks: - Add TypeScript interfaces for: - `GameState` - `World`,
+`WorldCell` - `Ant` - `Colony` - `DirtParticle` - `Settings` - Implement
+`createInitialGameState()`. - Implement `AntFarmCanvas` RAF loop. - Stub
+`simulateStep()`: - Random wander movement. - Boundary containment. -
+Implement renderer to: - Draw grid. - Draw ants as simple circles.
+
+Output: - Visible dirt background + ants wandering randomly.
+
+------------------------------------------------------------------------
+
+## **PR-003 --- Digging, Dirt Particles & Early Behavior**
+
+**Goal:** Implement digging and dirt chunks.
+
+Tasks: - World digging: - Ants convert dirt → air when in digging
+mode. - Spawn `DirtParticle` at location of removed cell. - Dirt
+particle simulation: - Gravity, bounce, resting logic. - Converting
+resting particles back into world dirt. - Basic hunger & food items: -
+UI drop food item. - Ants bias movement toward food.
+
+Output: - Ants can dig tunnels & dirt piles form dynamically.
+
+------------------------------------------------------------------------
+
+## **PR-004 --- Pheromones & Save/Load**
+
+**Goal:** Add pheromones, ant guidance, and persistence.
+
+Tasks: - Implement pheromone fields: - Evaporate. - Diffuse. - Deposit
+when carrying food/home. - Update ant movement logic to follow
+gradients. - Implement `saveGame()` / `loadGame()`: - On
+mount/unmount. - Fallback to initial state. - Add UI controls: -
+Pause/resume. - Speed: Normal/Fast. - Reset colony. - Debug overlays
+(optional).
+
+Output: - Full Phase 1 ant farm sim: dig → forage → trail → repeat.
+
+------------------------------------------------------------------------
+
+# 5. Future Considerations (Not part of Phase 1)
+
+These will be part of Phase 2+:
+
+-   Server-side simulation loop\
+-   Database persistence\
+-   Real-time evolution while offline\
+-   Shared colonies\
+-   ChatGPT-driven colony macro-brain
+
+------------------------------------------------------------------------
+
+# 6. Definition of Done (Phase 1)
+
+Phase 1 is complete when: - Ants can dig, move dirt, follow food, and
+follow pheromones. - User can place food/water/dirt & reset colony. -
+Canvas rendering runs smoothly. - GameState persists via localStorage. -
+Fully playable inside Farcaster mini app.
