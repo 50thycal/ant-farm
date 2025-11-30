@@ -1,0 +1,386 @@
+
+
+# antfarm-001 — SPEC.md (Phase 1: Client-Side Ant Farm Sim)
+
+## 0. One-Sentence Summary
+
+Build a pixel-art ant farm simulation that runs entirely in the browser (and inside a Farcaster mini app), where the user drops resources into the world and a simple colony AI controls ants that dig tunnels, move dirt, and forage — all powered by a pure, modular simulation core.
+
+---
+
+## 1. Scope — Phase 1 Only (/specify)
+
+**In scope (Phase 1)**
+
+- A **single-player ant farm** that runs fully client-side in the browser.
+- A **single `gameState` object** storing:
+  - `meta` (version, maybe timestamps)
+  - `world` (terrain grid, cells: dirt/air, pheromones)
+  - `colony` (resources, global stats, queen presence)
+  - `ants` (position, velocity, role, needs)
+  - `particles` (dirt chunks, etc.)
+  - `settings` (sim speed, UI toggles)
+- A **simulation loop**:
+  - Driven by `requestAnimationFrame`.
+  - Calls `simulateStep(gameState, dt)` on each tick.
+  - Then renders to a `<canvas>`.
+- **Ant behavior** (non-ChatGPT for now):
+  - Move, obey gravity & collisions.
+  - Dig tunnels (convert dirt → air).
+  - Carry and deposit dirt (simple pile behavior).
+  - Seek food if hungry; seek nest when “returning”.
+- **World behavior**:
+  - Gravity for dirt chunks.
+  - Simple pheromone fields (deposited when traveling between food and nest).
+- **Basic UI**:
+  - Canvas view of the ant farm.
+  - Control panel with:
+    - Add food
+    - Add water (even if not fully simulated yet)
+    - Add dirt block / obstacle
+    - Reset colony
+    - Sim speed control (normal / fast / paused).
+- **Save/load** via `localStorage`:
+  - `saveGame()` → `JSON.stringify(gameState)`.
+  - `loadGame()` → parse or fall back to `createInitialGameState()`.
+  - No offline “catch-up” math; sim is paused while closed.
+
+**Out of scope (Phase 1)**
+
+- No backend, no database, no server-side sim.
+- No real-time multiplayer or shared colonies.
+- No always-running server sim; colony only runs while tab is open.
+- No ChatGPT-driven ant brains yet (that’s a later phase).
+- No complex economy, upgrades, or progression systems beyond basic resources.
+
+---
+
+## 2. Success Criteria (MVP Is Done When…)
+
+Phase 1 is “feature complete” when:
+
+1. You can open the app (or mini app) and see:
+   - A visible ant farm area (dirt + air).
+   - A small number of ants moving around.
+2. Ants:
+   - Navigate reasonably through tunnels.
+   - Dig new tunnels when given space / direction logic.
+   - Move dirt chunks that visually pile up elsewhere.
+3. User can:
+   - Place food in the world and see ants eventually find it and “respond” (e.g., carry food or deposit pheromones).
+   - Modify the world a bit (add dirt / reset).
+   - Pause/resume and adjust sim speed.
+4. Closing and reopening:
+   - Restores `gameState` from `localStorage` and continues the sim.
+5. All simulation logic is **pure and modular** (in `/sim`) and does not depend on React/DOM, so it can later be moved server-side without rewriting.
+
+---
+
+## 3. Target Platform & Constraints
+
+- **Primary**: Web browser (desktop + mobile), deployed on Vercel.
+- **Mini-app**: Runs inside a Farcaster mini app frame using an existing, known-working mini app repo as the base.
+- **Performance constraints**:
+  - Must load fast inside the mini-app iframe.
+  - Use a modest grid size (e.g., 64×36 or similar) to keep updates cheap.
+  - Keep ant count modest at first (e.g., 20–60 ants).
+
+---
+
+## 4. Core Gameplay Loop
+
+**Player role**
+
+- The player is a **caretaker** of the ant farm.
+- They cannot directly control ants; they influence the environment.
+
+**Main loop**
+
+1. Open the ant farm.
+2. Watch ants dig and move dirt.
+3. Drop food/water/obstacles into the farm.
+4. Observe ants adapting (digging differently, forming trails, clustering around food).
+5. Optionally tweak sim speed or reset.
+
+**No hard win/lose condition for Phase 1** — this is a **sandbox simulator**. The “fun” is watching emergent behavior.
+
+---
+
+## 5. Simulation Design
+
+### 5.1. World Representation
+
+- Use a **grid** of cells for the farm.
+
+Example conceptual model:
+
+- `WorldCell`:
+  - `type`: `"dirt" | "air" | "stone"`
+  - `pheromoneFood`: `number` (0–1)
+  - `pheromoneHome`: `number` (0–1)
+- Grid stored as:
+  - `world.width`, `world.height`
+  - `world.cells: WorldCell[][]` (or flat array with index helper).
+
+### 5.2. Ant Representation
+
+- `Ant`:
+  - `id: string`
+  - `position: { x: number; y: number }` (can be sub-cell resolution)
+  - `velocity: { x: number; y: number }`
+  - `role: "worker" | "scout" | "nurse" | "soldier"` (start with just `"worker"` and `"scout"`).
+  - `state: "idle" | "wandering" | "seeking_food" | "returning_home" | "digging" | "carrying_dirt" | "carrying_food"`
+  - `hunger: number` (0–1, simple decay over time)
+  - `target?: { x: number; y: number }` (optional movement target)
+  - `carrying?: "dirt" | "food" | null`
+
+Ant behavior rules (Phase 1):
+
+- If `hunger` above threshold → bias behavior toward `seeking_food`.
+- If carrying food and near nest region → drop food, switch to `returning_home` or `wandering`.
+- If in “digging” state:
+  - When encountering dirt cell → convert to air, spawn dirt particle.
+- If wandering:
+  - Random walk with slight bias toward pheromone gradients.
+
+### 5.3. Pheromones
+
+- Two scalar fields:
+  - `pheromoneFood`
+  - `pheromoneHome`
+- Pheromones:
+  - Evaporate over time (`value *= decayFactor` per second).
+  - Diffuse lightly to neighboring cells (simple blur).
+  - Are deposited:
+    - By ants returning from food to home (`pheromoneFood`).
+    - By ants leaving the nest (`pheromoneHome`).
+
+Ant pathfinding (Phase 1):
+
+- No heavy A*; just **local gradient following**:
+  - Sample neighboring cells and move toward highest pheromone in desired field.
+
+### 5.4. Dirt Particles
+
+- `DirtParticle`:
+  - `position: { x, y }`
+  - `velocity: { x, y }`
+- Simulate:
+  - Gravity (vy += g * dt).
+  - Collision with world (if below cell is solid, stop).
+- When dirt particles come to rest:
+  - Option: convert to dirt cell nearby to form a mound.
+
+### 5.5. Simulation Step
+
+Single entry point:
+
+```ts
+function simulateStep(gameState: GameState, dt: number): GameState
+
+Responsibilities:
+	•	Update ant states and positions.
+	•	Handle digging and world cell updates.
+	•	Update dirt particles (gravity and resting logic).
+	•	Update pheromone evaporation and diffusion.
+	•	Update colony resource stats (simple counters).
+	•	Respect sim speed from settings (e.g., effectiveDt = dt * speedFactor).
+
+Sim code must NOT:
+	•	Read/write DOM.
+	•	Call requestAnimationFrame.
+	•	Depend on React.
+
+⸻
+
+6. Data Model (TypeScript Sketch)
+
+High-level interfaces (Claude will flesh out types):
+
+export interface GameState {
+  meta: {
+    version: number;
+  };
+  world: World;
+  colony: Colony;
+  ants: Ant[];
+  particles: DirtParticle[];
+  settings: Settings;
+}
+
+export interface World {
+  width: number;
+  height: number;
+  cells: WorldCell[]; // flat array length = width * height
+  // helper: getCell(x, y), setCell(x, y, cell)
+}
+
+export interface WorldCell {
+  type: "dirt" | "air" | "stone";
+  pheromoneFood: number;
+  pheromoneHome: number;
+}
+
+export interface Ant {
+  id: string;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  role: "worker" | "scout";
+  state:
+    | "idle"
+    | "wandering"
+    | "seeking_food"
+    | "returning_home"
+    | "digging"
+    | "carrying_dirt"
+    | "carrying_food";
+  hunger: number;
+  carrying: "none" | "dirt" | "food";
+}
+
+export interface DirtParticle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+}
+
+export interface Colony {
+  foodStored: number;
+  waterStored: number;
+  population: number;
+  queenAlive: boolean;
+}
+
+export interface Settings {
+  simSpeed: number; // 0 = paused, 1 = normal, 2 = fast
+  showDebugOverlays: boolean;
+}
+
+
+⸻
+
+7. UI & Layout
+
+Layout (mini-app friendly)
+	•	Mobile-first.
+	•	Single page:
+	•	Top: <canvas> ant farm view (fixed aspect ratio).
+	•	Bottom: control panel.
+
+Controls Panel
+	•	Buttons:
+	•	+ Food (drops a food item at a sensible default or last click position).
+	•	+ Water (placeholder effect in Phase 1, can be visual only).
+	•	+ Dirt Block (add a small dirt block somewhere near the top).
+	•	Reset Colony (clear localStorage and re-initialize GameState).
+	•	Sim controls:
+	•	Toggle or slider for Speed: [Pause | Normal | Fast].
+
+Optional debugging controls (dev only)
+	•	Checkbox: Show debug overlay (grid, pheromone heatmap, ant IDs).
+
+⸻
+
+8. Persistence (Phase 1)
+	•	On interval (e.g., every few seconds) and on unmount:
+	•	localStorage.setItem("antfarm-001-state", JSON.stringify(gameState)).
+	•	On mount:
+	•	Try loadGame() from localStorage.
+	•	If invalid or missing, fall back to createInitialGameState().
+
+No attempt to infer elapsed real-world time between saves.
+
+⸻
+
+9. Code Organization & Repo Expectations
+
+We will copy an existing, working Farcaster mini-app repo and repurpose it.
+
+Inside that repo, target structure:
+
+/src
+  /sim
+    gameState.ts        // types + createInitialGameState()
+    simulateStep.ts     // core loop
+    ants.ts             // ant movement/behavior helpers
+    world.ts            // grid helpers, digging, collisions
+    pheromones.ts       // deposit + decay + diffusion
+  /render
+    renderer.ts         // draw(gameState, canvasContext)
+  /ui
+    AntFarmCanvas.tsx   // manages canvas, RAF loop, hooks into sim
+    ControlsPanel.tsx   // UI for buttons + speed
+  pages/
+    index.tsx           // or app/page.tsx, uses AntFarmCanvas + ControlsPanel
+
+Rules:
+	•	/sim has no React/DOM imports.
+	•	/render knows only about GameState + CanvasRenderingContext2D.
+	•	/ui is where React/Next.js logic lives.
+
+⸻
+
+10. Implementation Milestones & PR Brief Seeds (/plan → /tasks)
+
+These are starting points for future PR briefs; Claude can expand them.
+
+PR-001 — Repo Setup & Skeleton
+	•	Clone/copy existing Farcaster mini app template repo.
+	•	Rename project to antfarm-001.
+	•	Wire a new AntFarmPage at root route.
+	•	Add placeholder <canvas> and control panel layout.
+	•	Confirm it builds, deploys to Vercel, and loads inside Farcaster mini app frame.
+
+PR-002 — GameState & Random Ants
+	•	Implement GameState, World, WorldCell, Ant, Colony, Settings types.
+	•	Implement createInitialGameState() with:
+	•	Basic dirt/air layout in the world grid.
+	•	A handful of ants with random starting positions near a “nest” area.
+	•	Implement simulateStep() stub that:
+	•	Updates positions with simple random walk.
+	•	Keeps ants inside bounds.
+	•	Implement AntFarmCanvas that:
+	•	Sets up requestAnimationFrame loop.
+	•	Calls simulateStep() and renderer.draw().
+	•	Implement renderer.ts to draw:
+	•	World grid (dirt vs air).
+	•	Ants as simple dots.
+
+PR-003 — Digging, Dirt & Basic Behaviors
+	•	Add “digging” behavior:
+	•	Ants occasionally dig downward/sideways when near dirt.
+	•	Dirt → air conversion in world.ts.
+	•	Implement DirtParticle simulation:
+	•	Spawn particles when dirt is dug out.
+	•	Gravity + simple collision → piles.
+	•	Add simple hunger + food items:
+	•	Allow dropping food via control panel.
+	•	Ants occasionally bias movement toward nearby food.
+
+PR-004 — Pheromones & Save/Load
+	•	Implement pheromones.ts:
+	•	Fields on WorldCell.
+	•	Deposit, decay, and lightweight diffusion.
+	•	Update ant behavior to:
+	•	Deposit pheromoneFood when returning from food.
+	•	Follow pheromone gradients when seeking food/nest.
+	•	Implement saveGame() / loadGame() using localStorage.
+	•	Add sim speed control to Settings and wire to UI.
+	•	Optional: debug overlay to visualize pheromone fields.
+
+⸻
+
+11. Future Phases (Not in Scope for Phase 1)
+	•	Phase 2:
+	•	Move simulateStep to a backend (Node/TS).
+	•	Persist gameState in a DB.
+	•	Implement idle/always-on behavior.
+	•	Phase 3+ (AI integration):
+	•	Use ChatGPT API as a higher-level colony “brain”, deciding macro behaviors, events, or personality traits of the colony, while the low-level sim remains deterministic.
+
+---
+
+If you want, next step I can do is draft **PR-001 and PR-002** as fully-formed briefs you can paste straight into Claude, but this SPEC is enough to start building.
