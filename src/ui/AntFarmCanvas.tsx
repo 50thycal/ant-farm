@@ -6,12 +6,18 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { createInitialGameState, type GameState } from '../sim/gameState';
+import {
+  createInitialGameState,
+  type GameState,
+  WORLD_WIDTH,
+  WORLD_HEIGHT,
+  CELL_SIZE,
+} from '../sim/gameState';
 import { simulateStep } from '../sim/simulateStep';
-import { draw } from '../render/renderer';
+import { drawGameState } from '../render/renderer';
 
-const CANVAS_WIDTH = 64 * 12; // 64 cells * 12px
-const CANVAS_HEIGHT = 36 * 12; // 36 cells * 12px
+const CANVAS_WIDTH = WORLD_WIDTH * CELL_SIZE;
+const CANVAS_HEIGHT = WORLD_HEIGHT * CELL_SIZE;
 
 interface AntFarmCanvasProps {
   onGameStateChange?: (gameState: GameState) => void;
@@ -67,11 +73,11 @@ export function AntFarmCanvas({ onGameStateChange }: AntFarmCanvasProps) {
         : 0;
       lastTimeRef.current = currentTime;
 
-      // Update simulation
-      gameStateRef.current = simulateStep(gameStateRef.current, dt);
+      // Update simulation (mutates gameState in-place)
+      simulateStep(gameStateRef.current, dt);
 
       // Render
-      draw(gameStateRef.current, ctx);
+      drawGameState(ctx, gameStateRef.current);
 
       // Notify parent of state change
       onGameStateChange?.(gameStateRef.current);

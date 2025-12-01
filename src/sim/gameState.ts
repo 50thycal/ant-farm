@@ -4,6 +4,14 @@
  */
 
 // ============================================================================
+// Constants
+// ============================================================================
+
+export const WORLD_WIDTH = 64;
+export const WORLD_HEIGHT = 36;
+export const CELL_SIZE = 12; // pixels per cell
+
+// ============================================================================
 // Core Types
 // ============================================================================
 
@@ -112,21 +120,18 @@ export function setCell(
 // ============================================================================
 
 export function createInitialGameState(): GameState {
-  const width = 64;
-  const height = 36;
-
   // Create world cells
   const cells: WorldCell[] = [];
-  const airThreshold = Math.floor(height * 0.2); // top 20% is air
+  const airThreshold = Math.floor(WORLD_HEIGHT * 0.2); // top 20% is air
 
   // Nest parameters (bottom-center)
   const nestWidth = 8;
   const nestHeight = 4;
-  const nestX = Math.floor((width - nestWidth) / 2);
-  const nestY = height - nestHeight - 4; // 4 cells from bottom
+  const nestX = Math.floor((WORLD_WIDTH - nestWidth) / 2);
+  const nestY = WORLD_HEIGHT - nestHeight - 4; // 4 cells from bottom
 
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
+  for (let y = 0; y < WORLD_HEIGHT; y++) {
+    for (let x = 0; x < WORLD_WIDTH; x++) {
       const isInNest =
         x >= nestX &&
         x < nestX + nestWidth &&
@@ -146,7 +151,7 @@ export function createInitialGameState(): GameState {
 
   // Create initial ants (spawn in nest area)
   const ants: Ant[] = [];
-  const initialAntCount = 10;
+  const initialAntCount = 20;
 
   for (let i = 0; i < initialAntCount; i++) {
     ants.push({
@@ -167,8 +172,8 @@ export function createInitialGameState(): GameState {
       version: 1,
     },
     world: {
-      width,
-      height,
+      width: WORLD_WIDTH,
+      height: WORLD_HEIGHT,
       cells,
     },
     colony: {

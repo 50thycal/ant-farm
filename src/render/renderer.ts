@@ -4,15 +4,17 @@
  */
 
 import type { GameState } from '../sim/gameState';
-
-const CELL_SIZE = 12; // pixels per grid cell
+import { CELL_SIZE } from '../sim/gameState';
 
 /**
  * Draw the game state to the canvas
- * @param gameState - current game state
  * @param ctx - 2D canvas rendering context
+ * @param gameState - current game state
  */
-export function draw(gameState: GameState, ctx: CanvasRenderingContext2D): void {
+export function drawGameState(
+  ctx: CanvasRenderingContext2D,
+  gameState: GameState
+): void {
   const { world } = gameState;
   const canvasWidth = world.width * CELL_SIZE;
   const canvasHeight = world.height * CELL_SIZE;
