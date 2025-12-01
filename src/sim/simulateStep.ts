@@ -131,13 +131,17 @@ function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
       setCellToAir(world, cellX, belowY);
       ant.carrying = 'dirt'; // Pick up the dirt
 
-      // Spawn dirt particle for visual effect only
-      gameState.particles.push({
-        x: cellX + 0.5,
-        y: belowY + 0.5,
-        vx: (Math.random() - 0.5) * 5,
-        vy: -5,
-      });
+      // Spawn multiple smaller dirt particles (4 particles per block)
+      // Each particle represents 1/4 the volume of the original dirt block
+      const particleCount = 4;
+      for (let i = 0; i < particleCount; i++) {
+        gameState.particles.push({
+          x: cellX + 0.3 + Math.random() * 0.4, // Spread within cell
+          y: belowY + 0.3 + Math.random() * 0.4,
+          vx: (Math.random() - 0.5) * 8, // More varied horizontal spread
+          vy: -3 - Math.random() * 4, // Varied upward velocity
+        });
+      }
     }
   }
 
