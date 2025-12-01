@@ -15,6 +15,7 @@ import {
 } from '../sim/gameState';
 import { simulateStep } from '../sim/simulateStep';
 import { drawGameState } from '../render/renderer';
+import { loadGameState, saveGameState } from '../sim/persistence';
 
 const CANVAS_WIDTH = WORLD_WIDTH * CELL_SIZE;
 const CANVAS_HEIGHT = WORLD_HEIGHT * CELL_SIZE;
@@ -25,38 +26,21 @@ interface AntFarmCanvasProps {
 
 export function AntFarmCanvas({ onGameStateChange }: AntFarmCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const gameStateRef = useRef<GameState>(createInitialGameState());
+  const gameStateRef = useRef<GameState>(loadGameState());
   const animationFrameRef = useRef<number | undefined>(undefined);
   const lastTimeRef = useRef<number>(0);
-
-  // Initialize game state
-  useEffect(() => {
-    // Try to load saved state from localStorage
-    try {
-      const saved = localStorage.getItem('antfarm-001-state');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        gameStateRef.current = parsed;
-      }
-    } catch (error) {
-      console.warn('Failed to load saved game state:', error);
-    }
-  }, []);
 
   // Save game state periodically
   useEffect(() => {
     const saveInterval = setInterval(() => {
-      try {
-        localStorage.setItem(
-          'antfarm-001-state',
-          JSON.stringify(gameStateRef.current)
-        );
-      } catch (error) {
-        console.warn('Failed to save game state:', error);
-      }
+      saveGameState(gameStateRef.current);
     }, 3000); // save every 3 seconds
 
-    return () => clearInterval(saveInterval);
+    // Save on unmount
+    return () => {
+      clearInterval(saveInterval);
+      saveGameState(gameStateRef.current);
+    };
   }, []);
 
   // Animation loop
@@ -103,8 +87,9 @@ export function AntFarmCanvas({ onGameStateChange }: AntFarmCanvasProps) {
         gameStateRef.current = newState;
       },
       resetGame: () => {
+        const { clearSavedState } = require('../sim/persistence');
+        clearSavedState();
         gameStateRef.current = createInitialGameState();
-        localStorage.removeItem('antfarm-001-state');
       },
     };
 
