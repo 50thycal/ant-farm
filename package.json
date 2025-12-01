@@ -1,0 +1,29 @@
+{
+  "name": "antfarm-001",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Ant Farm Simulator - A pixel-art ant colony simulation in a Farcaster mini app",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@farcaster/miniapp-core": "^0.4.1",
+    "@farcaster/miniapp-sdk": "^0.2.1",
+    "@neynar/nodejs-sdk": "^2.11.2",
+    "next": "^15.1.4",
+    "openai": "^4.77.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "typescript": "^5.8.3"
+  }
+}
