@@ -4,13 +4,11 @@
  */
 
 import type { World, WorldCell } from './gameState';
-import { WORLD_WIDTH, WORLD_HEIGHT } from './gameState';
+import { WORLD_HEIGHT } from './gameState';
 
-// Nest region constants (matching createInitialGameState)
-const NEST_WIDTH = 8;
-const NEST_HEIGHT = 4;
-const NEST_X = Math.floor((WORLD_WIDTH - NEST_WIDTH) / 2);
-const NEST_Y = WORLD_HEIGHT - NEST_HEIGHT - 4;
+// Nest region: define as bottom portion of world
+// (no pre-dug nest, but ants will establish here)
+const NEST_DEPTH_FROM_BOTTOM = 8; // bottom 8 rows considered "nest depth"
 
 /**
  * Get the index of a cell in the flat cells array
@@ -81,12 +79,8 @@ export function setCellToDirt(world: World, x: number, y: number): void {
 
 /**
  * Check if coordinates are in the nest region
+ * Now defined as the bottom portion of the world
  */
-export function isInNest(x: number, y: number): boolean {
-  return (
-    x >= NEST_X &&
-    x < NEST_X + NEST_WIDTH &&
-    y >= NEST_Y &&
-    y < NEST_Y + NEST_HEIGHT
-  );
+export function isInNest(_x: number, y: number): boolean {
+  return y >= WORLD_HEIGHT - NEST_DEPTH_FROM_BOTTOM;
 }

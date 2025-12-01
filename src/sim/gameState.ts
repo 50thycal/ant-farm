@@ -120,44 +120,34 @@ export function setCell(
 // ============================================================================
 
 export function createInitialGameState(): GameState {
-  // Create world cells
-  const cells: WorldCell[] = [];
-  const airThreshold = Math.floor(WORLD_HEIGHT * 0.2); // top 20% is air
+  // World constants
+  const SOIL_START_Y = 4; // rows 0-3 = air (surface), 4+ = dirt
 
-  // Nest parameters (bottom-center)
-  const nestWidth = 8;
-  const nestHeight = 4;
-  const nestX = Math.floor((WORLD_WIDTH - nestWidth) / 2);
-  const nestY = WORLD_HEIGHT - nestHeight - 4; // 4 cells from bottom
+  // Create world cells - simple surface with dirt below
+  const cells: WorldCell[] = [];
 
   for (let y = 0; y < WORLD_HEIGHT; y++) {
     for (let x = 0; x < WORLD_WIDTH; x++) {
-      const isInNest =
-        x >= nestX &&
-        x < nestX + nestWidth &&
-        y >= nestY &&
-        y < nestY + nestHeight;
-
-      const type = y < airThreshold || isInNest ? 'air' : 'dirt';
+      const isAir = y < SOIL_START_Y;
 
       cells.push({
-        type,
+        type: isAir ? 'air' : 'dirt',
         pheromoneFood: 0,
         pheromoneHome: 0,
-        isNest: isInNest,
+        isNest: false, // No pre-dug nest
       });
     }
   }
 
-  // Create initial ants (spawn in nest area)
+  // Create initial ants (spawn on surface)
   const ants: Ant[] = [];
-  const initialAntCount = 20;
+  const INITIAL_ANT_COUNT = 5;
 
-  for (let i = 0; i < initialAntCount; i++) {
+  for (let i = 0; i < INITIAL_ANT_COUNT; i++) {
     ants.push({
       id: `ant-${i}`,
-      x: nestX + Math.random() * nestWidth,
-      y: nestY + Math.random() * nestHeight,
+      x: Math.random() * WORLD_WIDTH, // anywhere along the surface
+      y: SOIL_START_Y - 0.5, // just above the soil line
       vx: 0,
       vy: 0,
       role: i % 3 === 0 ? 'scout' : 'worker',
@@ -179,7 +169,7 @@ export function createInitialGameState(): GameState {
     colony: {
       foodStored: 0,
       waterStored: 0,
-      population: initialAntCount,
+      population: INITIAL_ANT_COUNT,
       queenAlive: true,
     },
     ants,
