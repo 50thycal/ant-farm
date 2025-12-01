@@ -78,4 +78,26 @@ export function drawGameState(
     const screenY = particle.y * CELL_SIZE;
     ctx.fillRect(screenX - 1, screenY - 1, 2, 2);
   }
+
+  // Debug overlay: pheromone heatmap
+  if (gameState.settings.showDebugOverlays) {
+    for (let y = 0; y < world.height; y++) {
+      for (let x = 0; x < world.width; x++) {
+        const cellIndex = y * world.width + x;
+        const cell = world.cells[cellIndex];
+
+        // Draw food pheromone (green tint)
+        if (cell.pheromoneFood > 0.05) {
+          ctx.fillStyle = `rgba(0, 255, 0, ${cell.pheromoneFood * 0.5})`;
+          ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        }
+
+        // Draw home pheromone (blue tint)
+        if (cell.pheromoneHome > 0.05) {
+          ctx.fillStyle = `rgba(0, 100, 255, ${cell.pheromoneHome * 0.5})`;
+          ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        }
+      }
+    }
+  }
 }

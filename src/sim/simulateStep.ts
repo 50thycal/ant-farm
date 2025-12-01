@@ -10,7 +10,13 @@ import {
   setCellToAir,
   setCellToDirt,
   isSolidCell,
+  isInNest,
 } from './world';
+import {
+  updatePheromones,
+  depositFoodPheromone,
+  depositHomePheromone,
+} from './pheromones';
 
 // Physics constants
 const GRAVITY = 30; // cells per second squared
@@ -20,6 +26,11 @@ const HUNGER_RATE = 0.02; // hunger increase per second (full in ~50 seconds)
 const DIG_CHANCE_PER_SECOND = 0.5; // probability of digging when in dirt
 const FOOD_SEEK_THRESHOLD = 0.7; // hunger level to start seeking food
 const FOOD_EAT_RADIUS = 0.5; // distance to eat food
+
+// Pheromone constants
+const PHEROMONE_DEPOSIT_RATE = 0.6; // amount deposited per second
+const PHEROMONE_FOLLOW_THRESHOLD = 0.1; // minimum pheromone to follow
+const PHEROMONE_FOLLOW_FORCE = WANDER_FORCE * 1.5; // strength of pheromone following
 
 /**
  * Advance the simulation by one time step
@@ -42,7 +53,8 @@ export function simulateStep(gameState: GameState, dt: number): void {
   // Update dirt particles
   updateDirtParticles(gameState, effectiveDt);
 
-  // PR-004 will add pheromones
+  // Update pheromones (decay and diffusion)
+  updatePheromones(gameState, effectiveDt);
 }
 
 /**
@@ -80,8 +92,8 @@ function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
 
   // Movement behavior
   if (ant.hunger > FOOD_SEEK_THRESHOLD && foodItems.length > 0) {
-    // Food-seeking behavior
-    seekFood(ant, foodItems, dt);
+    // Food-seeking behavior with pheromone following
+    seekFood(ant, foodItems, dt, world);
   } else {
     // Random wandering
     randomWander(ant, dt);
@@ -121,6 +133,9 @@ function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
     ant.vy = -Math.abs(ant.vy); // bounce
   }
 
+  // Deposit pheromones
+  depositPheromones(ant, gameState, dt);
+
   // Check for food consumption
   checkFoodConsumption(ant, gameState);
 }
@@ -138,10 +153,33 @@ function randomWander(ant: Ant, dt: number): void {
 }
 
 /**
- * Seek nearest food item
+ * Seek nearest food item (with pheromone gradient following)
  */
-function seekFood(ant: Ant, foodItems: any[], dt: number): void {
-  // Find nearest food
+function seekFood(
+  ant: Ant,
+  foodItems: any[],
+  dt: number,
+  world: any
+): void {
+  const cellX = Math.floor(ant.x);
+  const cellY = Math.floor(ant.y);
+
+  // Try following food pheromone gradient first
+  const pheromoneDirection = followPheromoneGradient(
+    world,
+    cellX,
+    cellY,
+    'food'
+  );
+
+  if (pheromoneDirection) {
+    // Follow pheromone trail
+    ant.vx += pheromoneDirection.dx * PHEROMONE_FOLLOW_FORCE * dt;
+    ant.vy += pheromoneDirection.dy * PHEROMONE_FOLLOW_FORCE * dt;
+    return;
+  }
+
+  // Fall back to direct food seeking if no pheromones nearby
   let nearestFood = null;
   let nearestDist = Infinity;
 
@@ -167,6 +205,72 @@ function seekFood(ant: Ant, foodItems: any[], dt: number): void {
     const seekForce = WANDER_FORCE * 2; // stronger than random wander
     ant.vx += ux * seekForce * dt;
     ant.vy += uy * seekForce * dt;
+  }
+}
+
+/**
+ * Follow pheromone gradient in a given direction
+ */
+function followPheromoneGradient(
+  world: any,
+  cellX: number,
+  cellY: number,
+  type: 'food' | 'home'
+): { dx: number; dy: number } | null {
+  const offsets = [
+    { dx: 1, dy: 0 },
+    { dx: -1, dy: 0 },
+    { dx: 0, dy: 1 },
+    { dx: 0, dy: -1 },
+  ];
+
+  let bestValue = 0;
+  let bestDir = null;
+
+  for (const offset of offsets) {
+    const sx = cellX + offset.dx;
+    const sy = cellY + offset.dy;
+    const cell = getCell(world, sx, sy);
+    if (!cell) continue;
+
+    const value =
+      type === 'food' ? cell.pheromoneFood : cell.pheromoneHome;
+
+    if (value > bestValue && value > PHEROMONE_FOLLOW_THRESHOLD) {
+      bestValue = value;
+      bestDir = offset;
+    }
+  }
+
+  return bestDir;
+}
+
+/**
+ * Deposit pheromones based on ant state
+ */
+function depositPheromones(ant: Ant, gameState: GameState, dt: number): void {
+  const cellX = Math.floor(ant.x);
+  const cellY = Math.floor(ant.y);
+
+  // Deposit home pheromone when in or near nest
+  if (isInNest(cellX, cellY)) {
+    depositHomePheromone(
+      gameState,
+      ant.x,
+      ant.y,
+      PHEROMONE_DEPOSIT_RATE * dt
+    );
+  }
+
+  // Deposit food pheromone when satisfied (recently ate)
+  // Use low hunger as proxy for "returning from food"
+  if (ant.hunger < 0.3) {
+    depositFoodPheromone(
+      gameState,
+      ant.x,
+      ant.y,
+      PHEROMONE_DEPOSIT_RATE * dt
+    );
   }
 }
 

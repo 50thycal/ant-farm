@@ -64,6 +64,15 @@ export function ControlsPanel({ gameState }: ControlsPanelProps) {
     api.setGameState(state);
   };
 
+  const handleDebugToggle = () => {
+    const api = (window as any).antFarmAPI;
+    if (!api) return;
+
+    const state = api.getGameState();
+    state.settings.showDebugOverlays = !state.settings.showDebugOverlays;
+    api.setGameState(state);
+  };
+
   return (
     <div
       style={{
@@ -186,6 +195,33 @@ export function ControlsPanel({ gameState }: ControlsPanelProps) {
           }}
         >
           Fast
+        </button>
+      </div>
+
+      {/* Debug Controls */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+        }}
+      >
+        <button
+          onClick={handleDebugToggle}
+          style={{
+            padding: '0.25rem 0.75rem',
+            backgroundColor:
+              gameState?.settings.showDebugOverlays ? '#333' : '#ddd',
+            color: gameState?.settings.showDebugOverlays ? 'white' : '#333',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '12px',
+          }}
+        >
+          {gameState?.settings.showDebugOverlays
+            ? '🔍 Debug: ON'
+            : '🔍 Debug: OFF'}
         </button>
       </div>
 
