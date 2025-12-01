@@ -10,6 +10,7 @@
 export const WORLD_WIDTH = 64;
 export const WORLD_HEIGHT = 36;
 export const CELL_SIZE = 12; // pixels per cell
+export const SOIL_START_Y = 4; // rows 0-3 = air (surface), 4+ = dirt
 
 // ============================================================================
 // Core Types
@@ -120,9 +121,6 @@ export function setCell(
 // ============================================================================
 
 export function createInitialGameState(): GameState {
-  // World constants
-  const SOIL_START_Y = 4; // rows 0-3 = air (surface), 4+ = dirt
-
   // Create world cells - simple surface with dirt below
   const cells: WorldCell[] = [];
 
@@ -147,12 +145,12 @@ export function createInitialGameState(): GameState {
     ants.push({
       id: `ant-${i}`,
       x: Math.random() * WORLD_WIDTH, // anywhere along the surface
-      y: SOIL_START_Y - 0.5, // just above the soil line
+      y: SOIL_START_Y - 0.2, // always ABOVE the surface (no randomness)
       vx: 0,
       vy: 0,
       role: i % 3 === 0 ? 'scout' : 'worker',
       state: 'wandering',
-      hunger: Math.random() * 0.3, // start with low hunger
+      hunger: 0, // start with no hunger
       carrying: 'none',
     });
   }

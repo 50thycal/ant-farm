@@ -4,7 +4,7 @@
  */
 
 import type { GameState, Ant } from './gameState';
-import { WORLD_WIDTH, WORLD_HEIGHT } from './gameState';
+import { WORLD_WIDTH, WORLD_HEIGHT, SOIL_START_Y } from './gameState';
 import {
   getCell,
   setCellToAir,
@@ -75,6 +75,12 @@ function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
 
   // Increase hunger over time
   ant.hunger = Math.min(1, ant.hunger + HUNGER_RATE * dt);
+
+  // Sanity check: prevent ants from spawning or glitching into dirt
+  if (ant.y >= SOIL_START_Y) {
+    ant.y = SOIL_START_Y - 0.2;
+    ant.vy = 0;
+  }
 
   // Apply gravity when not on ground
   if (!isAntOnGround(ant, world)) {
