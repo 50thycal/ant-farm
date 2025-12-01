@@ -68,6 +68,42 @@ function isAntOnGround(ant: Ant, world: any): boolean {
 }
 
 /**
+ * Deposit dirt near ant's current location at surface
+ * Spreads mound horizontally around tunnel entrance
+ */
+function depositDirt(ant: Ant, world: any): void {
+  const antX = Math.floor(ant.x);
+  const searchRadius = 2; // Search within ±2 cells
+
+  // Try to find air cell near ant's position
+  for (let dx = -searchRadius; dx <= searchRadius; dx++) {
+    const testX = antX + dx;
+    if (testX < 0 || testX >= WORLD_WIDTH) continue;
+
+    // Find first air cell at or above surface at this X coordinate
+    let moundY = SOIL_START_Y - 1; // Start at row 3
+    while (moundY >= 0 && isSolidCell(world, testX, moundY)) {
+      moundY--; // Move up to build mound higher
+    }
+
+    // Found an air cell, place dirt there and return
+    if (moundY >= 0) {
+      setCellToDirt(world, testX, moundY);
+      return;
+    }
+  }
+
+  // Fallback: if no air cell found nearby, place at ant's current X
+  let moundY = SOIL_START_Y - 1;
+  while (moundY >= 0 && isSolidCell(world, antX, moundY)) {
+    moundY--;
+  }
+  if (moundY >= 0) {
+    setCellToDirt(world, antX, moundY);
+  }
+}
+
+/**
  * Update a single ant with wandering, digging, and food-seeking behavior
  */
 function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
@@ -85,20 +121,36 @@ function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
   }
 
   // Digging behavior: dig cell below feet when standing on dirt
-  if (isAntOnGround(ant, world)) {
+  // Ant picks up dirt to carry to surface
+  if (isAntOnGround(ant, world) && ant.carrying === 'none') {
     const cellX = Math.floor(ant.x);
     const belowY = Math.floor(ant.y + ANT_RADIUS + 0.01);
 
     const digChance = DIG_CHANCE_PER_SECOND * dt;
     if (Math.random() < digChance) {
       setCellToAir(world, cellX, belowY);
-      // Spawn dirt particle at dug cell
+      ant.carrying = 'dirt'; // Pick up the dirt
+
+      // Spawn dirt particle for visual effect only
       gameState.particles.push({
         x: cellX + 0.5,
         y: belowY + 0.5,
-        vx: (Math.random() - 0.5) * 5, // small random horizontal velocity
-        vy: -5, // initial upward velocity
+        vx: (Math.random() - 0.5) * 5,
+        vy: -5,
       });
+    }
+  }
+
+  // Carrying dirt behavior: return to surface and deposit
+  if (ant.carrying === 'dirt') {
+    // Strong upward bias to return to surface
+    ant.vy += -WANDER_FORCE * 0.8 * dt;
+
+    // Check if reached surface
+    if (ant.y < SOIL_START_Y) {
+      // Deposit dirt near current location (spread mound horizontally)
+      depositDirt(ant, world);
+      ant.carrying = 'none';
     }
   }
 
@@ -350,23 +402,9 @@ function updateDirtParticles(gameState: GameState, dt: number): void {
     const cellX = Math.floor(particle.x);
     const cellY = Math.floor(particle.y);
 
-    // Check if particle hit bottom or solid cell
+    // Remove particle when it hits bottom or solid cell
+    // Particles are now just visual effects; dirt placement handled by ant carrying
     if (cellY >= WORLD_HEIGHT - 1 || isSolidCell(world, cellX, cellY)) {
-      // Place dirt at surface to build mound (not at landing spot)
-      // Start searching from just below surface and move up
-      let moundY = SOIL_START_Y - 1; // Row 3 (just below surface at row 4)
-
-      // Find first available air cell at or above this level
-      while (moundY >= 0 && isSolidCell(world, cellX, moundY)) {
-        moundY--; // Move up to build mound higher
-      }
-
-      // Place dirt at surface/mound location
-      if (moundY >= 0) {
-        setCellToDirt(world, cellX, moundY);
-      }
-
-      // Mark particle for removal
       particlesToRemove.push(i);
     }
   }
