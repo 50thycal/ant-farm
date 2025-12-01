@@ -125,13 +125,14 @@ function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
   ant.y += ant.vy * dt;
 
   // Ground collision: keep ant on top of dirt, not inside it
+  // Use same formula as isAntOnGround() to check the cell below feet
   const cellX = Math.floor(ant.x);
-  const cellY = Math.floor(ant.y);
-  const cellBelow = getCell(world, cellX, cellY + 1);
+  const belowY = Math.floor(ant.y + ANT_RADIUS + 0.01);
+  const cellBelow = getCell(world, cellX, belowY);
 
   if (cellBelow && (cellBelow.type === 'dirt' || cellBelow.type === 'stone')) {
     // Ant is overlapping with solid ground, push it up
-    const groundY = cellY + 1;
+    const groundY = belowY;
     if (ant.y + ANT_RADIUS > groundY) {
       ant.y = groundY - ANT_RADIUS;
       ant.vy = 0; // stop vertical movement when landing
