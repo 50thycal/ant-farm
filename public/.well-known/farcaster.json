@@ -1,0 +1,18 @@
+{
+  "accountAssociation": {
+    "header": "eyJmaWQiOjIwOTY1LCJ0eXBlIjoiY3VzdG9keSIsImtleSI6IjB4RjA0NjJGZGI0MUVCMDM3Q2ExODQzOTFENjc0YjlDMUYxMWJkMTRBMiJ9",
+    "payload": "eyJkb21haW4iOiJhbnQtZmFybS1wdWNlLnZlcmNlbC5hcHAifQ",
+    "signature": "dsxY7bD9Lf2oet54B14UzSJ/ZixvKpI/HQqcL7eI1LkvLlrgBjhhJTkcSCuNpAOrOH8DKuwg8Hbgt+Sk9XE4lxs="
+  },
+  "frame": {
+    "version": "1",
+    "name": "Ant Farm (Phase 1)",
+    "iconUrl": "https://ant-farm-puce.vercel.app/icon.png",
+    "homeUrl": "https://ant-farm-puce.vercel.app",
+    "imageUrl": "https://ant-farm-puce.vercel.app/image.png",
+    "buttonTitle": "Check this out",
+    "splashImageUrl": "https://ant-farm-puce.vercel.app/splash.png",
+    "splashBackgroundColor": "#eeccff",
+    "webhookUrl": "https://ant-farm-puce.vercel.app/api/webhook"
+  }
+}
