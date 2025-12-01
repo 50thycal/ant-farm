@@ -4,7 +4,7 @@
  */
 
 import type { GameState, Ant } from './gameState';
-import { WORLD_WIDTH, WORLD_HEIGHT } from './gameState';
+import { WORLD_WIDTH, WORLD_HEIGHT, SOIL_START_Y } from './gameState';
 import {
   getCell,
   setCellToAir,
@@ -77,8 +77,11 @@ function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
   ant.hunger = Math.min(1, ant.hunger + HUNGER_RATE * dt);
 
   // Apply gravity when not on ground
+  // Reduce gravity in tunnels (below surface) to allow traversal
   if (!isAntOnGround(ant, world)) {
-    ant.vy += GRAVITY * dt;
+    const belowSurface = ant.y >= SOIL_START_Y;
+    const gravityMultiplier = belowSurface ? 0.15 : 1.0; // Much less gravity in tunnels
+    ant.vy += GRAVITY * gravityMultiplier * dt;
   }
 
   // Digging behavior: dig cell below feet when standing on dirt
@@ -166,6 +169,7 @@ function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
 
 /**
  * Apply random wandering acceleration (primarily horizontal)
+ * Adds vertical movement when in tunnels below surface
  */
 function randomWander(ant: Ant, dt: number): void {
   // Apply random horizontal wandering acceleration occasionally
@@ -173,6 +177,13 @@ function randomWander(ant: Ant, dt: number): void {
     // Horizontal movement: randomly choose left or right
     const direction = Math.random() < 0.5 ? -1 : 1;
     ant.vx += direction * WANDER_FORCE * dt;
+
+    // Add vertical wandering when in tunnels (below surface)
+    // This allows ants to climb up through their tunnels
+    if (ant.y >= SOIL_START_Y) {
+      const verticalDirection = Math.random() < 0.5 ? -1 : 1;
+      ant.vy += verticalDirection * WANDER_FORCE * 0.5 * dt; // Half strength vertical
+    }
   }
 }
 
@@ -341,11 +352,20 @@ function updateDirtParticles(gameState: GameState, dt: number): void {
 
     // Check if particle hit bottom or solid cell
     if (cellY >= WORLD_HEIGHT - 1 || isSolidCell(world, cellX, cellY)) {
-      // Try to place dirt in cell above
-      const pileY = Math.max(0, cellY - 1);
-      if (!isSolidCell(world, cellX, pileY)) {
-        setCellToDirt(world, cellX, pileY);
+      // Place dirt at surface to build mound (not at landing spot)
+      // Start searching from just below surface and move up
+      let moundY = SOIL_START_Y - 1; // Row 3 (just below surface at row 4)
+
+      // Find first available air cell at or above this level
+      while (moundY >= 0 && isSolidCell(world, cellX, moundY)) {
+        moundY--; // Move up to build mound higher
       }
+
+      // Place dirt at surface/mound location
+      if (moundY >= 0) {
+        setCellToDirt(world, cellX, moundY);
+      }
+
       // Mark particle for removal
       particlesToRemove.push(i);
     }
