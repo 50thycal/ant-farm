@@ -26,6 +26,7 @@ const HUNGER_RATE = 0.02; // hunger increase per second (full in ~50 seconds)
 const DIG_CHANCE_PER_SECOND = 0.5; // probability of digging when in dirt
 const FOOD_SEEK_THRESHOLD = 0.7; // hunger level to start seeking food
 const FOOD_EAT_RADIUS = 0.5; // distance to eat food
+const ANT_RADIUS = 0.3; // ant size for collision detection
 
 // Pheromone constants
 const PHEROMONE_DEPOSIT_RATE = 0.6; // amount deposited per second
@@ -58,6 +59,15 @@ export function simulateStep(gameState: GameState, dt: number): void {
 }
 
 /**
+ * Check if ant is standing on solid ground
+ */
+function isAntOnGround(ant: Ant, world: any): boolean {
+  const belowY = Math.floor(ant.y + ANT_RADIUS + 0.01);
+  const cellX = Math.floor(ant.x);
+  return isSolidCell(world, cellX, belowY);
+}
+
+/**
  * Update a single ant with wandering, digging, and food-seeking behavior
  */
 function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
@@ -66,24 +76,23 @@ function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
   // Increase hunger over time
   ant.hunger = Math.min(1, ant.hunger + HUNGER_RATE * dt);
 
-  // Check current cell for digging
-  const cellX = Math.floor(ant.x);
-  const cellY = Math.floor(ant.y);
-  const cell = getCell(world, cellX, cellY);
+  // Apply gravity when not on ground
+  if (!isAntOnGround(ant, world)) {
+    ant.vy += GRAVITY * dt;
+  }
 
-  // Digging behavior: convert dirt to air and spawn particle
-  if (
-    cell &&
-    cell.type === 'dirt' &&
-    cellY > WORLD_HEIGHT * 0.2 // don't dig near surface
-  ) {
+  // Digging behavior: dig cell below feet when standing on dirt
+  if (isAntOnGround(ant, world)) {
+    const cellX = Math.floor(ant.x);
+    const belowY = Math.floor(ant.y + ANT_RADIUS + 0.01);
+
     const digChance = DIG_CHANCE_PER_SECOND * dt;
     if (Math.random() < digChance) {
-      setCellToAir(world, cellX, cellY);
-      // Spawn dirt particle at cell center
+      setCellToAir(world, cellX, belowY);
+      // Spawn dirt particle at dug cell
       gameState.particles.push({
         x: cellX + 0.5,
-        y: cellY + 0.5,
+        y: belowY + 0.5,
         vx: (Math.random() - 0.5) * 5, // small random horizontal velocity
         vy: -5, // initial upward velocity
       });
@@ -115,6 +124,20 @@ function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
   ant.x += ant.vx * dt;
   ant.y += ant.vy * dt;
 
+  // Ground collision: keep ant on top of dirt, not inside it
+  const cellX = Math.floor(ant.x);
+  const cellY = Math.floor(ant.y);
+  const cellBelow = getCell(world, cellX, cellY + 1);
+
+  if (cellBelow && (cellBelow.type === 'dirt' || cellBelow.type === 'stone')) {
+    // Ant is overlapping with solid ground, push it up
+    const groundY = cellY + 1;
+    if (ant.y + ANT_RADIUS > groundY) {
+      ant.y = groundY - ANT_RADIUS;
+      ant.vy = 0; // stop vertical movement when landing
+    }
+  }
+
   // Keep ants within world bounds
   if (ant.x < 0) {
     ant.x = 0;
@@ -141,14 +164,14 @@ function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
 }
 
 /**
- * Apply random wandering acceleration
+ * Apply random wandering acceleration (primarily horizontal)
  */
 function randomWander(ant: Ant, dt: number): void {
-  // Apply random wandering acceleration occasionally
+  // Apply random horizontal wandering acceleration occasionally
   if (Math.random() < 0.1) {
-    const angle = Math.random() * Math.PI * 2;
-    ant.vx += Math.cos(angle) * WANDER_FORCE * dt;
-    ant.vy += Math.sin(angle) * WANDER_FORCE * dt;
+    // Horizontal movement: randomly choose left or right
+    const direction = Math.random() < 0.5 ? -1 : 1;
+    ant.vx += direction * WANDER_FORCE * dt;
   }
 }
 
