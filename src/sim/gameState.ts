@@ -59,6 +59,7 @@ export interface Ant {
     | 'carrying_food';
   hunger: number; // 0-1
   carrying: 'none' | 'dirt' | 'food';
+  climbTime?: number; // Debug: track time spent climbing (ladder mode)
 }
 
 export interface DirtParticle {

@@ -185,26 +185,41 @@ function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
   // Increase hunger over time
   ant.hunger = Math.min(1, ant.hunger + HUNGER_RATE * dt);
 
-  // Check if ant has support (floor or walls)
-  const supported = isAntSupported(ant, world);
   const belowSurface = ant.y >= SOIL_START_Y - 0.5;
-  const onSurface = ant.y < SOIL_START_Y - 0.2;
+  const onSurface = ant.y < SOIL_START_Y - 0.5;
 
-  // Gravity and climbing behavior
+  // ========================================
+  // LADDER MODE: Deterministic climbing for carrying ants
+  // ========================================
   if (ant.carrying === 'dirt' && belowSurface) {
-    // CLIMBING MODE: Ant is carrying dirt in a tunnel
-    if (supported) {
-      // Touching wall or floor - apply smooth climbing force (not instant velocity)
-      const CLIMB_FORCE = 25; // upward acceleration (cells per second²)
-      ant.vy += -CLIMB_FORCE * dt; // Accumulate velocity smoothly
-      // Damp horizontal movement while climbing for more vertical focus
-      ant.vx *= 0.8;
-    } else {
-      // In open air within tunnel - reduced gravity
-      ant.vy += GRAVITY * 0.3 * dt;
+    // LADDER MODE: Ant climbs straight up, ignoring physics
+    const CLIMB_SPEED = 8; // constant upward speed (cells per second)
+
+    // Force upward movement (no gravity, no physics)
+    ant.vy = -CLIMB_SPEED;
+
+    // Heavily damp horizontal jitter
+    ant.vx *= 0.2;
+
+    // Snap toward center of current column to stay in shaft
+    const colX = Math.floor(ant.x) + 0.5;
+    ant.x += (colX - ant.x) * 0.2;
+
+    // Debug: Track climb time to detect stuck ants
+    if (!ant.climbTime) ant.climbTime = 0;
+    ant.climbTime += dt;
+    if (ant.climbTime > 10) {
+      console.warn('Ant stuck carrying dirt?', ant.id, 'at', ant.x.toFixed(1), ant.y.toFixed(1));
+      ant.climbTime = 0; // Reset to avoid spam
     }
   } else {
-    // NORMAL MODE: Not carrying dirt, or already on surface
+    // Not in ladder mode - reset climb timer
+    ant.climbTime = 0;
+
+    // Check if ant has support (floor or walls)
+    const supported = isAntSupported(ant, world);
+
+    // NORMAL MODE: Standard physics
     if (!supported) {
       // In open air - apply gravity
       const gravityMultiplier = belowSurface ? 0.2 : 1.0; // Reduced in tunnels
@@ -265,53 +280,69 @@ function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
   ant.x += ant.vx * dt;
   ant.y += ant.vy * dt;
 
-  // Multi-directional collision: prevent overlap with solid blocks
-  // Use slightly smaller collision box (80%) to allow ants to fit in tight spaces
+  // Collision detection - SIMPLIFIED for ladder mode
   const COLLISION_RADIUS = ANT_RADIUS * 0.8;
-
-  // Check BELOW (floor)
   const cellX = Math.floor(ant.x);
-  const belowY = Math.floor(ant.y + COLLISION_RADIUS);
-  const cellBelow = getCell(world, cellX, belowY);
-  if (cellBelow && (cellBelow.type === 'dirt' || cellBelow.type === 'stone')) {
-    const groundY = belowY;
-    if (ant.y + COLLISION_RADIUS > groundY) {
-      ant.y = groundY - COLLISION_RADIUS;
-      if (ant.vy > 0) ant.vy = 0; // Stop falling, but allow climbing
-    }
-  }
 
-  // Check ABOVE (ceiling)
-  const aboveY = Math.floor(ant.y - COLLISION_RADIUS);
-  const cellAbove = getCell(world, cellX, aboveY);
-  if (cellAbove && (cellAbove.type === 'dirt' || cellAbove.type === 'stone')) {
-    const ceilingY = aboveY + 1; // Bottom of ceiling cell
-    if (ant.y - COLLISION_RADIUS < ceilingY) {
+  // LADDER MODE COLLISION: Only check ceiling above
+  if (ant.carrying === 'dirt' && belowSurface) {
+    // Only prevent climbing into solid ceiling
+    const aheadY = Math.floor(ant.y - COLLISION_RADIUS);
+    const aheadCell = getCell(world, cellX, aheadY);
+
+    if (aheadCell && (aheadCell.type === 'dirt' || aheadCell.type === 'stone')) {
+      // Hit ceiling - stop right below it
+      const ceilingY = aheadY + 1;
       ant.y = ceilingY + COLLISION_RADIUS;
-      if (ant.vy < 0) ant.vy = 0; // Stop rising into ceiling
+      ant.vy = 0;
     }
-  }
+    // Otherwise: let ant climb freely through air
+  } else {
+    // NORMAL MODE COLLISION: Full 4-directional collision
 
-  // Check LEFT (left wall)
-  const leftX = Math.floor(ant.x - COLLISION_RADIUS);
-  const cellY = Math.floor(ant.y);
-  const cellLeft = getCell(world, leftX, cellY);
-  if (cellLeft && (cellLeft.type === 'dirt' || cellLeft.type === 'stone')) {
-    const wallX = leftX + 1; // Right edge of left wall
-    if (ant.x - COLLISION_RADIUS < wallX) {
-      ant.x = wallX + COLLISION_RADIUS;
-      if (ant.vx < 0) ant.vx = 0; // Stop moving left
+    // Check BELOW (floor)
+    const belowY = Math.floor(ant.y + COLLISION_RADIUS);
+    const cellBelow = getCell(world, cellX, belowY);
+    if (cellBelow && (cellBelow.type === 'dirt' || cellBelow.type === 'stone')) {
+      const groundY = belowY;
+      if (ant.y + COLLISION_RADIUS > groundY) {
+        ant.y = groundY - COLLISION_RADIUS;
+        if (ant.vy > 0) ant.vy = 0; // Stop falling
+      }
     }
-  }
 
-  // Check RIGHT (right wall)
-  const rightX = Math.floor(ant.x + COLLISION_RADIUS);
-  const cellRight = getCell(world, rightX, cellY);
-  if (cellRight && (cellRight.type === 'dirt' || cellRight.type === 'stone')) {
-    const wallX = rightX; // Left edge of right wall
-    if (ant.x + COLLISION_RADIUS > wallX) {
-      ant.x = wallX - COLLISION_RADIUS;
-      if (ant.vx > 0) ant.vx = 0; // Stop moving right
+    // Check ABOVE (ceiling)
+    const aboveY = Math.floor(ant.y - COLLISION_RADIUS);
+    const cellAbove = getCell(world, cellX, aboveY);
+    if (cellAbove && (cellAbove.type === 'dirt' || cellAbove.type === 'stone')) {
+      const ceilingY = aboveY + 1;
+      if (ant.y - COLLISION_RADIUS < ceilingY) {
+        ant.y = ceilingY + COLLISION_RADIUS;
+        if (ant.vy < 0) ant.vy = 0; // Stop rising
+      }
+    }
+
+    // Check LEFT (left wall)
+    const leftX = Math.floor(ant.x - COLLISION_RADIUS);
+    const cellY = Math.floor(ant.y);
+    const cellLeft = getCell(world, leftX, cellY);
+    if (cellLeft && (cellLeft.type === 'dirt' || cellLeft.type === 'stone')) {
+      const wallX = leftX + 1;
+      if (ant.x - COLLISION_RADIUS < wallX) {
+        ant.x = wallX + COLLISION_RADIUS;
+        if (ant.vx < 0) ant.vx = 0; // Stop moving left
+      }
+    }
+
+    // Check RIGHT (right wall)
+    const rightX = Math.floor(ant.x + COLLISION_RADIUS);
+    const cellRight = getCell(world, rightX, cellY);
+    if (cellRight && (cellRight.type === 'dirt' || cellRight.type === 'stone')) {
+      const wallX = rightX;
+      if (ant.x + COLLISION_RADIUS > wallX) {
+        ant.x = wallX - COLLISION_RADIUS;
+        if (ant.vx > 0) ant.vx = 0; // Stop moving right
+      }
     }
   }
 
