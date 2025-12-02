@@ -8,7 +8,7 @@ import { CELL_SIZE } from '../sim/gameState';
 
 // Size constants (relative to cell size)
 const ANT_RADIUS_FACTOR = 0.3; // Ant size relative to cell
-const DIRT_PARTICLE_RADIUS_FACTOR = ANT_RADIUS_FACTOR * 0.25; // Dirt is 1/4 ant size
+// const DIRT_PARTICLE_RADIUS_FACTOR = ANT_RADIUS_FACTOR * 0.25; // Dirt is 1/4 ant size (commented for test)
 
 /**
  * Draw a single ant
@@ -30,11 +30,13 @@ function drawAnt(ctx: CanvasRenderingContext2D, ant: Ant): void {
 function drawDirtParticle(ctx: CanvasRenderingContext2D, particle: DirtParticle): void {
   const x = particle.x * CELL_SIZE;
   const y = particle.y * CELL_SIZE;
-  const r = CELL_SIZE * DIRT_PARTICLE_RADIUS_FACTOR;
+
+  // Hard-coded test: tiny magenta dots
+  const r = 2; // fixed 2px, independent of CELL_SIZE
 
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.fillStyle = '#7a5a3a'; // brown dirt
+  ctx.fillStyle = "#ff00ff"; // bright magenta
   ctx.fill();
 }
 
