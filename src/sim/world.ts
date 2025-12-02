@@ -4,7 +4,7 @@
  */
 
 import type { World, WorldCell } from './gameState';
-import { WORLD_HEIGHT } from './gameState';
+import { WORLD_HEIGHT, SOIL_START_Y } from './gameState';
 
 // Nest region: define as bottom portion of world
 // (no pre-dug nest, but ants will establish here)
@@ -83,4 +83,20 @@ export function setCellToDirt(world: World, x: number, y: number): void {
  */
 export function isInNest(_x: number, y: number): boolean {
   return y >= WORLD_HEIGHT - NEST_DEPTH_FROM_BOTTOM;
+}
+
+/**
+ * Check if a column has a tunnel (air) below the surface
+ * Used to detect tunnel entrances that should not be clogged with dirt
+ */
+export function columnHasTunnelBelowSurface(world: World, x: number): boolean {
+  // Scan from just below surface to bottom
+  for (let y = SOIL_START_Y + 1; y < WORLD_HEIGHT; y++) {
+    const cell = getCell(world, x, y);
+    if (!cell) continue;
+    if (cell.type === 'air') {
+      return true; // Found tunnel
+    }
+  }
+  return false; // No tunnel in this column
 }

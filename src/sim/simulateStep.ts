@@ -11,6 +11,7 @@ import {
   setCellToDirt,
   isSolidCell,
   isInNest,
+  columnHasTunnelBelowSurface,
 } from './world';
 import {
   updatePheromones,
@@ -86,32 +87,48 @@ function weightedRandomOffset(maxOffset: number): number {
 /**
  * Deposit dirt near ant's current location at surface
  * Builds a rounded mound around tunnel entrance using weighted distribution
+ * Avoids clogging tunnel entrances by skipping columns with active tunnels
  */
 function depositDirt(ant: Ant, world: any): void {
   const surfaceX = Math.floor(ant.x); // Where ant surfaced (tunnel entrance)
   const MOUND_RADIUS = 5; // Spread mound ±5 tiles from entrance for natural ant hill
+  const MAX_ATTEMPTS = 8; // Try multiple positions to avoid entrance
 
-  // Weighted random offset: favor center, allow spread to form rounded mound
-  // Triangular distribution makes center 4x more likely than edges
-  const offset = weightedRandomOffset(MOUND_RADIUS);
-  const depositX = surfaceX + offset;
+  // Try to find a valid position that doesn't block a tunnel entrance
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    // Weighted random offset: favor center, allow spread to form rounded mound
+    // Triangular distribution makes center 4x more likely than edges
+    const offset = weightedRandomOffset(MOUND_RADIUS);
+    const depositX = surfaceX + offset;
 
-  // Ensure within world bounds
-  if (depositX < 0 || depositX >= WORLD_WIDTH) {
-    return; // Can't place outside world
+    // Ensure within world bounds
+    if (depositX < 0 || depositX >= WORLD_WIDTH) {
+      continue; // Try another position
+    }
+
+    // Check if this column has a tunnel below - if so, avoid placing dirt here
+    // This prevents clogging the entrance
+    const hasTunnel = columnHasTunnelBelowSurface(world, depositX);
+    if (hasTunnel) {
+      continue; // Skip this position, try another
+    }
+
+    // Find the surface/mound height at this X coordinate
+    // Start just above original surface and scan upward through any existing mound
+    let depositY = SOIL_START_Y - 1; // Start at row 11 (just above surface at row 12)
+    while (depositY >= 0 && isSolidCell(world, depositX, depositY)) {
+      depositY--; // Move up to top of existing mound
+    }
+
+    // Place dirt at the air cell above the mound
+    if (depositY >= 0) {
+      setCellToDirt(world, depositX, depositY);
+      return; // Successfully placed dirt
+    }
   }
 
-  // Find the surface/mound height at this X coordinate
-  // Start just above original surface and scan upward through any existing mound
-  let depositY = SOIL_START_Y - 1; // Start at row 11 (just above surface at row 12)
-  while (depositY >= 0 && isSolidCell(world, depositX, depositY)) {
-    depositY--; // Move up to top of existing mound
-  }
-
-  // Place dirt at the air cell above the mound
-  if (depositY >= 0) {
-    setCellToDirt(world, depositX, depositY);
-  }
+  // Fallback: if all attempts failed, just don't place the dirt
+  // (Better than clogging entrance or crashing)
 }
 
 /**
