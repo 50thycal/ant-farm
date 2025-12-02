@@ -70,6 +70,34 @@ function isAntOnGround(ant: Ant, world: any): boolean {
 }
 
 /**
+ * Check if ant is supported by terrain (floor OR walls)
+ * Allows climbing in tunnels by detecting contact with walls
+ */
+function isAntSupported(ant: Ant, world: any): boolean {
+  const x = ant.x;
+  const y = ant.y;
+
+  // Sample multiple points around the ant's perimeter
+  const testPoints = [
+    { dx: 0, dy: ANT_RADIUS * 0.15 },                // directly below
+    { dx: -ANT_RADIUS * 0.8, dy: ANT_RADIUS * 0.7 }, // below-left
+    { dx: ANT_RADIUS * 0.8, dy: ANT_RADIUS * 0.7 },  // below-right
+    { dx: -ANT_RADIUS * 0.9, dy: 0 },                 // left wall
+    { dx: ANT_RADIUS * 0.9, dy: 0 },                  // right wall
+  ];
+
+  for (const { dx, dy } of testPoints) {
+    const cx = Math.floor(x + dx);
+    const cy = Math.floor(y + dy);
+    if (isSolidCell(world, cx, cy)) {
+      return true; // Touching solid terrain (has traction)
+    }
+  }
+
+  return false; // In open air, no support
+}
+
+/**
  * Find the best column to drop dirt near the ant
  * Chooses the lowest mound in a nearby range to create natural spreading
  * Avoids tunnel entrances and verifies air cell availability
@@ -157,12 +185,32 @@ function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
   // Increase hunger over time
   ant.hunger = Math.min(1, ant.hunger + HUNGER_RATE * dt);
 
-  // Apply gravity when not on ground
-  // Reduce gravity in tunnels (below surface) to allow traversal
-  if (!isAntOnGround(ant, world)) {
-    const belowSurface = ant.y >= SOIL_START_Y;
-    const gravityMultiplier = belowSurface ? 0.15 : 1.0; // Much less gravity in tunnels
-    ant.vy += GRAVITY * gravityMultiplier * dt;
+  // Check if ant has support (floor or walls)
+  const supported = isAntSupported(ant, world);
+  const belowSurface = ant.y >= SOIL_START_Y - 0.5;
+  const onSurface = ant.y < SOIL_START_Y - 0.2;
+
+  // Gravity and climbing behavior
+  if (ant.carrying === 'dirt' && belowSurface) {
+    // CLIMBING MODE: Ant is carrying dirt in a tunnel
+    if (supported) {
+      // Touching wall or floor - climb upward deterministically
+      const CLIMB_SPEED = 10; // cells per second
+      ant.vy = -CLIMB_SPEED;
+    } else {
+      // In open air within tunnel - reduced gravity
+      ant.vy += GRAVITY * 0.3 * dt;
+    }
+  } else {
+    // NORMAL MODE: Not carrying dirt, or already on surface
+    if (!supported) {
+      // In open air - apply gravity
+      const gravityMultiplier = belowSurface ? 0.2 : 1.0; // Reduced in tunnels
+      ant.vy += GRAVITY * gravityMultiplier * dt;
+    } else {
+      // Supported - damp vertical velocity to prevent jitter
+      ant.vy *= 0.5;
+    }
   }
 
   // Digging behavior: dig cell below feet when standing on dirt
@@ -179,21 +227,15 @@ function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
     }
   }
 
-  // Carrying dirt behavior: return to surface and deposit
-  if (ant.carrying === 'dirt') {
-    // Strong upward bias to return to surface
-    ant.vy += -WANDER_FORCE * 0.8 * dt;
-
-    // Check if reached surface
-    if (ant.y < SOIL_START_Y) {
-      // Try to deposit dirt near current location (spread mound horizontally)
-      // STRICT CONSERVATION: Only clear carrying if dirt was actually placed
-      const placed = depositDirt(ant, world);
-      if (placed) {
-        ant.carrying = 'none'; // Successfully dropped dirt
-      }
-      // If not placed, ant keeps carrying and will try again next frame
+  // Carrying dirt behavior: deposit when reaching surface
+  if (ant.carrying === 'dirt' && onSurface) {
+    // On surface - try to deposit dirt
+    // STRICT CONSERVATION: Only clear carrying if dirt was actually placed
+    const placed = depositDirt(ant, world);
+    if (placed) {
+      ant.carrying = 'none'; // Successfully dropped dirt
     }
+    // If not placed, ant keeps carrying and will try again next frame
   }
 
   // Movement behavior
@@ -222,7 +264,7 @@ function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
   ant.y += ant.vy * dt;
 
   // Ground collision: keep ant on top of dirt, not inside it
-  // Use same formula as isAntOnGround() to check the cell below feet
+  // Don't interfere with climbing behavior
   const cellX = Math.floor(ant.x);
   const belowY = Math.floor(ant.y + ANT_RADIUS + 0.01);
   const cellBelow = getCell(world, cellX, belowY);
@@ -232,7 +274,11 @@ function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
     const groundY = belowY;
     if (ant.y + ANT_RADIUS > groundY) {
       ant.y = groundY - ANT_RADIUS;
-      ant.vy = 0; // stop vertical movement when landing
+      // Only stop vertical movement if moving downward (falling)
+      // Don't cancel climbing velocity (upward movement)
+      if (ant.vy > 0) {
+        ant.vy = 0; // stop falling when landing
+      }
     }
   }
 
