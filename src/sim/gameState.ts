@@ -7,10 +7,10 @@
 // Constants
 // ============================================================================
 
-export const WORLD_WIDTH = 64;
-export const WORLD_HEIGHT = 36;
-export const CELL_SIZE = 12; // pixels per cell
-export const SOIL_START_Y = 4; // rows 0-3 = air (surface), 4+ = dirt
+export const WORLD_WIDTH = 192;  // 3x finer grid (was 64)
+export const WORLD_HEIGHT = 108; // 3x finer grid (was 36)
+export const CELL_SIZE = 4; // pixels per cell (was 12 - now 3x smaller)
+export const SOIL_START_Y = 12; // rows 0-11 = air (surface), 12+ = dirt (was 4)
 
 // ============================================================================
 // Core Types
