@@ -57,9 +57,7 @@ export function drawGameState(
   ctx.fillStyle = '#000000';
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-  // TEMP: Disable world cell rendering to isolate particles
   // Draw world cells
-  /*
   for (let y = 0; y < world.height; y++) {
     for (let x = 0; x < world.width; x++) {
       const cellIndex = y * world.width + x;
@@ -72,13 +70,12 @@ export function drawGameState(
       } else if (cell.isNest) {
         ctx.fillStyle = '#2a2a2a'; // dark gray for nest
       } else {
-        ctx.fillStyle = '#87CEEB'; // sky blue for air
+        ctx.fillStyle = '#000000'; // black for air (matches background)
       }
 
       ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
     }
   }
-  */
 
   // Draw ants
   for (const ant of gameState.ants) {
