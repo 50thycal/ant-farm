@@ -6,8 +6,8 @@
 import type { GameState, Ant, DirtParticle } from '../sim/gameState';
 import { CELL_SIZE } from '../sim/gameState';
 
-// Size constants (relative to cell size)
-const ANT_RADIUS_FACTOR = 0.3; // Ant size relative to cell
+// Size constants
+const ANT_RADIUS = 3; // Fixed 3px radius (6px diameter) - stands out against 4px tiles
 // const DIRT_PARTICLE_RADIUS_FACTOR = ANT_RADIUS_FACTOR * 0.25; // Dirt is 1/4 ant size (commented for test)
 
 /**
@@ -16,10 +16,9 @@ const ANT_RADIUS_FACTOR = 0.3; // Ant size relative to cell
 function drawAnt(ctx: CanvasRenderingContext2D, ant: Ant): void {
   const antPixelX = ant.x * CELL_SIZE;
   const antPixelY = ant.y * CELL_SIZE;
-  const antRadius = CELL_SIZE * ANT_RADIUS_FACTOR;
 
   ctx.beginPath();
-  ctx.arc(antPixelX, antPixelY, antRadius, 0, Math.PI * 2);
+  ctx.arc(antPixelX, antPixelY, ANT_RADIUS, 0, Math.PI * 2);
   ctx.fillStyle = '#FF0000'; // red
   ctx.fill();
 }
