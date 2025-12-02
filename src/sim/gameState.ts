@@ -7,9 +7,10 @@
 // Constants
 // ============================================================================
 
-export const WORLD_WIDTH = 64;
-export const WORLD_HEIGHT = 36;
-export const CELL_SIZE = 12; // pixels per cell
+export const WORLD_WIDTH = 192;  // 3x finer grid (was 64)
+export const WORLD_HEIGHT = 108; // 3x finer grid (was 36)
+export const CELL_SIZE = 4; // pixels per cell (was 12 - now 3x smaller)
+export const SOIL_START_Y = 12; // rows 0-11 = air (surface), 12+ = dirt (was 4)
 
 // ============================================================================
 // Core Types
@@ -41,12 +42,18 @@ export interface WorldCell {
   isNest: boolean;
 }
 
+export type AntMode =
+  | 'idleSurface'      // walking on surface, not carrying
+  | 'diggingDown'      // inside shaft, moving down to dig
+  | 'carryingUp'       // inside shaft, moving up with dirt
+  | 'carryingSurface'; // on surface with dirt, looking to drop
+
 export interface Ant {
   id: string;
   x: number;
   y: number;
-  vx: number;
-  vy: number;
+  vx: number; // kept for compatibility but not actively used
+  vy: number; // kept for compatibility but not actively used
   role: 'worker' | 'scout';
   state:
     | 'idle'
@@ -58,6 +65,11 @@ export interface Ant {
     | 'carrying_food';
   hunger: number; // 0-1
   carrying: 'none' | 'dirt' | 'food';
+
+  // New state machine fields
+  mode: AntMode;
+  hasDirt: boolean;   // true if carrying one dirt block
+  homeColumn: number; // column of the shaft this ant works on
 }
 
 export interface DirtParticle {
@@ -120,9 +132,6 @@ export function setCell(
 // ============================================================================
 
 export function createInitialGameState(): GameState {
-  // World constants
-  const SOIL_START_Y = 4; // rows 0-3 = air (surface), 4+ = dirt
-
   // Create world cells - simple surface with dirt below
   const cells: WorldCell[] = [];
 
@@ -144,16 +153,21 @@ export function createInitialGameState(): GameState {
   const INITIAL_ANT_COUNT = 5;
 
   for (let i = 0; i < INITIAL_ANT_COUNT; i++) {
+    const x = Math.random() * WORLD_WIDTH;
     ants.push({
       id: `ant-${i}`,
-      x: Math.random() * WORLD_WIDTH, // anywhere along the surface
-      y: SOIL_START_Y - 0.5, // just above the soil line
+      x,
+      y: SOIL_START_Y - 0.5, // on surface
       vx: 0,
       vy: 0,
       role: i % 3 === 0 ? 'scout' : 'worker',
       state: 'wandering',
-      hunger: Math.random() * 0.3, // start with low hunger
+      hunger: 0,
       carrying: 'none',
+      // New state machine fields
+      mode: 'idleSurface',
+      hasDirt: false,
+      homeColumn: Math.floor(x),
     });
   }
 

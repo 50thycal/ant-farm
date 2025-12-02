@@ -4,34 +4,25 @@
  */
 
 import type { GameState, Ant } from './gameState';
-import { WORLD_WIDTH, WORLD_HEIGHT } from './gameState';
+import { WORLD_WIDTH, WORLD_HEIGHT, SOIL_START_Y } from './gameState';
 import {
   getCell,
   setCellToAir,
   setCellToDirt,
-  isSolidCell,
-  isInNest,
 } from './world';
 import {
   updatePheromones,
-  depositFoodPheromone,
-  depositHomePheromone,
 } from './pheromones';
 
-// Physics constants
-const GRAVITY = 30; // cells per second squared
-const MAX_SPEED = 15; // cells per second
-const WANDER_FORCE = 20; // random acceleration magnitude
-const HUNGER_RATE = 0.02; // hunger increase per second (full in ~50 seconds)
-const DIG_CHANCE_PER_SECOND = 0.5; // probability of digging when in dirt
-const FOOD_SEEK_THRESHOLD = 0.7; // hunger level to start seeking food
-const FOOD_EAT_RADIUS = 0.5; // distance to eat food
-const ANT_RADIUS = 0.3; // ant size for collision detection
-
-// Pheromone constants
-const PHEROMONE_DEPOSIT_RATE = 0.6; // amount deposited per second
-const PHEROMONE_FOLLOW_THRESHOLD = 0.1; // minimum pheromone to follow
-const PHEROMONE_FOLLOW_FORCE = WANDER_FORCE * 1.5; // strength of pheromone following
+// All old physics constants commented out - state machine doesn't use them
+// const GRAVITY = 30;
+// const MAX_SPEED = 15;
+// const WANDER_FORCE = 20;
+// const FOOD_SEEK_THRESHOLD = 0.7;
+// const FOOD_EAT_RADIUS = 0.5;
+// const PHEROMONE_DEPOSIT_RATE = 0.6;
+// const PHEROMONE_FOLLOW_THRESHOLD = 0.1;
+// const PHEROMONE_FOLLOW_FORCE = WANDER_FORCE * 1.5;
 
 /**
  * Advance the simulation by one time step
@@ -58,300 +49,180 @@ export function simulateStep(gameState: GameState, dt: number): void {
   updatePheromones(gameState, effectiveDt);
 }
 
+// Old helper functions - not used by state machine
+// (commented out to avoid unused function errors)
+
 /**
- * Check if ant is standing on solid ground
+ * Helper: clamp value between min and max
  */
-function isAntOnGround(ant: Ant, world: any): boolean {
-  const belowY = Math.floor(ant.y + ANT_RADIUS + 0.01);
-  const cellX = Math.floor(ant.x);
-  return isSolidCell(world, cellX, belowY);
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
 }
 
 /**
- * Update a single ant with wandering, digging, and food-seeking behavior
+ * Find Y coordinate to drop dirt on surface at column x
+ * Returns first air cell above soil/mound, or -1 if none
  */
-function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
-  const { world, foodItems } = gameState;
-
-  // Increase hunger over time
-  ant.hunger = Math.min(1, ant.hunger + HUNGER_RATE * dt);
-
-  // Apply gravity when not on ground
-  if (!isAntOnGround(ant, world)) {
-    ant.vy += GRAVITY * dt;
-  }
-
-  // Digging behavior: dig cell below feet when standing on dirt
-  if (isAntOnGround(ant, world)) {
-    const cellX = Math.floor(ant.x);
-    const belowY = Math.floor(ant.y + ANT_RADIUS + 0.01);
-
-    const digChance = DIG_CHANCE_PER_SECOND * dt;
-    if (Math.random() < digChance) {
-      setCellToAir(world, cellX, belowY);
-      // Spawn dirt particle at dug cell
-      gameState.particles.push({
-        x: cellX + 0.5,
-        y: belowY + 0.5,
-        vx: (Math.random() - 0.5) * 5, // small random horizontal velocity
-        vy: -5, // initial upward velocity
-      });
+function findSurfaceDropY(world: any, x: number): number {
+  // Scan from surface upward to find first air cell
+  for (let y = SOIL_START_Y - 1; y >= 0; y--) {
+    const cell = getCell(world, x, y);
+    if (!cell) continue;
+    if (cell.type === 'air') {
+      return y; // Place dirt here
     }
   }
-
-  // Movement behavior
-  if (ant.hunger > FOOD_SEEK_THRESHOLD && foodItems.length > 0) {
-    // Food-seeking behavior with pheromone following
-    seekFood(ant, foodItems, dt, world);
-  } else {
-    // Random wandering
-    randomWander(ant, dt);
-  }
-
-  // Apply friction
-  const friction = 0.95;
-  ant.vx *= friction;
-  ant.vy *= friction;
-
-  // Clamp velocity to max speed
-  const speed = Math.sqrt(ant.vx * ant.vx + ant.vy * ant.vy);
-  if (speed > MAX_SPEED) {
-    ant.vx = (ant.vx / speed) * MAX_SPEED;
-    ant.vy = (ant.vy / speed) * MAX_SPEED;
-  }
-
-  // Update position
-  ant.x += ant.vx * dt;
-  ant.y += ant.vy * dt;
-
-  // Ground collision: keep ant on top of dirt, not inside it
-  const cellX = Math.floor(ant.x);
-  const cellY = Math.floor(ant.y);
-  const cellBelow = getCell(world, cellX, cellY + 1);
-
-  if (cellBelow && (cellBelow.type === 'dirt' || cellBelow.type === 'stone')) {
-    // Ant is overlapping with solid ground, push it up
-    const groundY = cellY + 1;
-    if (ant.y + ANT_RADIUS > groundY) {
-      ant.y = groundY - ANT_RADIUS;
-      ant.vy = 0; // stop vertical movement when landing
-    }
-  }
-
-  // Keep ants within world bounds
-  if (ant.x < 0) {
-    ant.x = 0;
-    ant.vx = Math.abs(ant.vx); // bounce
-  }
-  if (ant.x >= WORLD_WIDTH) {
-    ant.x = WORLD_WIDTH - 0.1;
-    ant.vx = -Math.abs(ant.vx); // bounce
-  }
-  if (ant.y < 0) {
-    ant.y = 0;
-    ant.vy = Math.abs(ant.vy); // bounce
-  }
-  if (ant.y >= WORLD_HEIGHT) {
-    ant.y = WORLD_HEIGHT - 0.1;
-    ant.vy = -Math.abs(ant.vy); // bounce
-  }
-
-  // Deposit pheromones
-  depositPheromones(ant, gameState, dt);
-
-  // Check for food consumption
-  checkFoodConsumption(ant, gameState);
+  return -1; // No air available
 }
 
 /**
- * Apply random wandering acceleration (primarily horizontal)
+ * STATE: idleSurface - ant walks on surface, occasionally starts digging
  */
-function randomWander(ant: Ant, dt: number): void {
-  // Apply random horizontal wandering acceleration occasionally
-  if (Math.random() < 0.1) {
-    // Horizontal movement: randomly choose left or right
-    const direction = Math.random() < 0.5 ? -1 : 1;
-    ant.vx += direction * WANDER_FORCE * dt;
+function updateIdleSurface(ant: Ant, world: any, dt: number): void {
+  const SPEED = 4 * dt;
+
+  // Simple left/right wobble on surface
+  ant.x += (Math.random() < 0.5 ? -1 : 1) * SPEED;
+  ant.x = clamp(ant.x, 0.5, WORLD_WIDTH - 0.5);
+  ant.y = SOIL_START_Y - 0.5; // Stay at surface
+
+  // Occasionally decide to start/continue shaft at current column
+  const col = Math.floor(ant.x);
+  const belowCell = getCell(world, col, SOIL_START_Y);
+
+  const canDigHere = belowCell && (belowCell.type === 'dirt' || belowCell.type === 'stone');
+  const START_DIG_CHANCE = 0.005 * dt; // Low chance per frame
+
+  if (canDigHere && Math.random() < START_DIG_CHANCE) {
+    ant.homeColumn = col;
+    ant.mode = 'diggingDown';
+    ant.y = SOIL_START_Y - 0.5; // Position at surface
   }
 }
 
 /**
- * Seek nearest food item (with pheromone gradient following)
+ * STATE: diggingDown - ant moves down shaft until hitting dirt, then digs
  */
-function seekFood(
-  ant: Ant,
-  foodItems: any[],
-  dt: number,
-  world: any
-): void {
-  const cellX = Math.floor(ant.x);
-  const cellY = Math.floor(ant.y);
+function updateDiggingDown(ant: Ant, world: any, dt: number): void {
+  const SPEED = 6 * dt;
 
-  // Try following food pheromone gradient first
-  const pheromoneDirection = followPheromoneGradient(
-    world,
-    cellX,
-    cellY,
-    'food'
-  );
+  // Stay centered in shaft
+  ant.x = ant.homeColumn + 0.5;
 
-  if (pheromoneDirection) {
-    // Follow pheromone trail
-    ant.vx += pheromoneDirection.dx * PHEROMONE_FOLLOW_FORCE * dt;
-    ant.vy += pheromoneDirection.dy * PHEROMONE_FOLLOW_FORCE * dt;
+  // Move down
+  ant.y += SPEED;
+
+  const cellX = ant.homeColumn;
+  const cellY = Math.floor(ant.y + 0.5);
+
+  // Stop at bottom of world
+  if (cellY >= WORLD_HEIGHT - 1) {
+    ant.mode = 'carryingUp';
     return;
   }
 
-  // Fall back to direct food seeking if no pheromones nearby
-  let nearestFood = null;
-  let nearestDist = Infinity;
+  // Check if we hit dirt
+  const cell = getCell(world, cellX, cellY);
+  if (cell && (cell.type === 'dirt' || cell.type === 'stone')) {
+    // Dig this cell
+    setCellToAir(world, cellX, cellY);
+    ant.hasDirt = true;
+    ant.carrying = 'dirt'; // For visual indicator
 
-  for (const food of foodItems) {
-    const dx = food.x - ant.x;
-    const dy = food.y - ant.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist < nearestDist) {
-      nearestDist = dist;
-      nearestFood = food;
+    // Position ant in the newly dug space
+    ant.y = cellY - 0.5;
+    ant.mode = 'carryingUp';
+  }
+}
+
+/**
+ * STATE: carryingUp - ant climbs straight up shaft with dirt
+ */
+function updateCarryingUp(ant: Ant, _world: any, dt: number): void {
+  const CLIMB_SPEED = 6 * dt;
+
+  // Stay centered in shaft
+  ant.x = ant.homeColumn + 0.5;
+
+  // Move up
+  ant.y -= CLIMB_SPEED;
+
+  // Check if reached surface
+  if (ant.y < SOIL_START_Y - 0.5) {
+    ant.mode = 'carryingSurface';
+    ant.y = SOIL_START_Y - 0.5;
+  }
+}
+
+/**
+ * STATE: carryingSurface - ant walks on surface with dirt, then drops it
+ */
+function updateCarryingSurface(ant: Ant, world: any, dt: number): void {
+  const SPEED = 3 * dt;
+
+  // Stay at surface
+  ant.y = SOIL_START_Y - 0.5;
+
+  // Wander near home column (biased to stay nearby)
+  const targetX = ant.homeColumn + 0.5;
+  const bias = (targetX - ant.x) * 0.1;
+  ant.x += bias + (Math.random() - 0.5) * SPEED;
+  ant.x = clamp(ant.x, 0.5, WORLD_WIDTH - 0.5);
+
+  // Random chance to drop dirt
+  const DROP_CHANCE = 0.03 * dt;
+
+  if (Math.random() < DROP_CHANCE) {
+    const col = Math.floor(ant.x);
+
+    // Skip if this would clog the tunnel entrance
+    if (Math.abs(col - ant.homeColumn) < 1) {
+      return; // Too close to entrance, keep carrying
     }
-  }
 
-  if (nearestFood) {
-    // Compute direction toward food
-    const dx = nearestFood.x - ant.x;
-    const dy = nearestFood.y - ant.y;
-    const len = Math.hypot(dx, dy) || 1;
-    const ux = dx / len;
-    const uy = dy / len;
+    const dropY = findSurfaceDropY(world, col);
 
-    // Apply steering force toward food
-    const seekForce = WANDER_FORCE * 2; // stronger than random wander
-    ant.vx += ux * seekForce * dt;
-    ant.vy += uy * seekForce * dt;
-  }
-}
-
-/**
- * Follow pheromone gradient in a given direction
- */
-function followPheromoneGradient(
-  world: any,
-  cellX: number,
-  cellY: number,
-  type: 'food' | 'home'
-): { dx: number; dy: number } | null {
-  const offsets = [
-    { dx: 1, dy: 0 },
-    { dx: -1, dy: 0 },
-    { dx: 0, dy: 1 },
-    { dx: 0, dy: -1 },
-  ];
-
-  let bestValue = 0;
-  let bestDir = null;
-
-  for (const offset of offsets) {
-    const sx = cellX + offset.dx;
-    const sy = cellY + offset.dy;
-    const cell = getCell(world, sx, sy);
-    if (!cell) continue;
-
-    const value =
-      type === 'food' ? cell.pheromoneFood : cell.pheromoneHome;
-
-    if (value > bestValue && value > PHEROMONE_FOLLOW_THRESHOLD) {
-      bestValue = value;
-      bestDir = offset;
-    }
-  }
-
-  return bestDir;
-}
-
-/**
- * Deposit pheromones based on ant state
- */
-function depositPheromones(ant: Ant, gameState: GameState, dt: number): void {
-  const cellX = Math.floor(ant.x);
-  const cellY = Math.floor(ant.y);
-
-  // Deposit home pheromone when in or near nest
-  if (isInNest(cellX, cellY)) {
-    depositHomePheromone(
-      gameState,
-      ant.x,
-      ant.y,
-      PHEROMONE_DEPOSIT_RATE * dt
-    );
-  }
-
-  // Deposit food pheromone when satisfied (recently ate)
-  // Use low hunger as proxy for "returning from food"
-  if (ant.hunger < 0.3) {
-    depositFoodPheromone(
-      gameState,
-      ant.x,
-      ant.y,
-      PHEROMONE_DEPOSIT_RATE * dt
-    );
-  }
-}
-
-/**
- * Check if ant is close enough to eat food
- */
-function checkFoodConsumption(ant: Ant, gameState: GameState): void {
-  for (let i = gameState.foodItems.length - 1; i >= 0; i--) {
-    const food = gameState.foodItems[i];
-    const dx = food.x - ant.x;
-    const dy = food.y - ant.y;
-    const dist = Math.hypot(dx, dy);
-
-    if (dist < FOOD_EAT_RADIUS) {
-      // Eat the food
-      gameState.foodItems.splice(i, 1);
-      ant.hunger = 0;
-      gameState.colony.foodStored += 1;
-      break; // only eat one food item per frame
+    if (dropY >= 0) {
+      setCellToDirt(world, col, dropY);
+      ant.hasDirt = false;
+      ant.carrying = 'none';
+      ant.mode = 'idleSurface';
     }
   }
 }
 
 /**
- * Update all dirt particles with gravity and collision
+ * Update a single ant using simple state machine (no physics)
  */
-function updateDirtParticles(gameState: GameState, dt: number): void {
-  const { world, particles } = gameState;
-  const particlesToRemove: number[] = [];
+function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
+  const { world } = gameState;
 
-  for (let i = 0; i < particles.length; i++) {
-    const particle = particles[i];
-
-    // Apply gravity
-    particle.vy += GRAVITY * dt;
-
-    // Update position
-    particle.x += particle.vx * dt;
-    particle.y += particle.vy * dt;
-
-    // Check collision with world
-    const cellX = Math.floor(particle.x);
-    const cellY = Math.floor(particle.y);
-
-    // Check if particle hit bottom or solid cell
-    if (cellY >= WORLD_HEIGHT - 1 || isSolidCell(world, cellX, cellY)) {
-      // Try to place dirt in cell above
-      const pileY = Math.max(0, cellY - 1);
-      if (!isSolidCell(world, cellX, pileY)) {
-        setCellToDirt(world, cellX, pileY);
-      }
-      // Mark particle for removal
-      particlesToRemove.push(i);
-    }
+  // State machine - deterministic dig/carry/drop cycle
+  switch (ant.mode) {
+    case 'idleSurface':
+      updateIdleSurface(ant, world, dt);
+      break;
+    case 'diggingDown':
+      updateDiggingDown(ant, world, dt);
+      break;
+    case 'carryingUp':
+      updateCarryingUp(ant, world, dt);
+      break;
+    case 'carryingSurface':
+      updateCarryingSurface(ant, world, dt);
+      break;
   }
 
-  // Remove settled particles (reverse order to maintain indices)
-  for (let i = particlesToRemove.length - 1; i >= 0; i--) {
-    particles.splice(particlesToRemove[i], 1);
-  }
+  // Keep ants within world bounds
+  ant.x = clamp(ant.x, 0.5, WORLD_WIDTH - 0.5);
+  ant.y = clamp(ant.y, 0, WORLD_HEIGHT - 0.5);
 }
+
+/**
+ * Update dirt particles (disabled for now - using simple state machine)
+ */
+function updateDirtParticles(_gameState: GameState, _dt: number): void {
+  // Particle physics disabled - state machine handles dirt directly
+}
+
+// Old physics-based movement functions removed (not used by state machine)
