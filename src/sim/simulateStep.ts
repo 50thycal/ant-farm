@@ -28,7 +28,7 @@ const HUNGER_RATE = 0.02; // hunger increase per second (full in ~50 seconds)
 const DIG_CHANCE_PER_SECOND = 0.5; // probability of digging when in dirt
 const FOOD_SEEK_THRESHOLD = 0.7; // hunger level to start seeking food
 const FOOD_EAT_RADIUS = 0.5; // distance to eat food
-const ANT_RADIUS = 0.3; // ant size for collision detection
+const ANT_RADIUS = 1.2; // ant size for collision detection (cells, ~4.8px with CELL_SIZE=4)
 
 // Pheromone constants
 const PHEROMONE_DEPOSIT_RATE = 0.6; // amount deposited per second
@@ -266,8 +266,8 @@ function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
   ant.y += ant.vy * dt;
 
   // Multi-directional collision: prevent overlap with solid blocks
-  // Use tight collision box (90% of ant radius) to prevent visual overlap
-  const COLLISION_RADIUS = ANT_RADIUS * 0.9;
+  // Use slightly smaller collision box (80%) to allow ants to fit in tight spaces
+  const COLLISION_RADIUS = ANT_RADIUS * 0.8;
 
   // Check BELOW (floor)
   const cellX = Math.floor(ant.x);
@@ -276,7 +276,7 @@ function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
   if (cellBelow && (cellBelow.type === 'dirt' || cellBelow.type === 'stone')) {
     const groundY = belowY;
     if (ant.y + COLLISION_RADIUS > groundY) {
-      ant.y = groundY - COLLISION_RADIUS - 0.01;
+      ant.y = groundY - COLLISION_RADIUS;
       if (ant.vy > 0) ant.vy = 0; // Stop falling, but allow climbing
     }
   }
@@ -287,7 +287,7 @@ function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
   if (cellAbove && (cellAbove.type === 'dirt' || cellAbove.type === 'stone')) {
     const ceilingY = aboveY + 1; // Bottom of ceiling cell
     if (ant.y - COLLISION_RADIUS < ceilingY) {
-      ant.y = ceilingY + COLLISION_RADIUS + 0.01;
+      ant.y = ceilingY + COLLISION_RADIUS;
       if (ant.vy < 0) ant.vy = 0; // Stop rising into ceiling
     }
   }
@@ -299,7 +299,7 @@ function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
   if (cellLeft && (cellLeft.type === 'dirt' || cellLeft.type === 'stone')) {
     const wallX = leftX + 1; // Right edge of left wall
     if (ant.x - COLLISION_RADIUS < wallX) {
-      ant.x = wallX + COLLISION_RADIUS + 0.01;
+      ant.x = wallX + COLLISION_RADIUS;
       if (ant.vx < 0) ant.vx = 0; // Stop moving left
     }
   }
@@ -310,7 +310,7 @@ function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
   if (cellRight && (cellRight.type === 'dirt' || cellRight.type === 'stone')) {
     const wallX = rightX; // Left edge of right wall
     if (ant.x + COLLISION_RADIUS > wallX) {
-      ant.x = wallX - COLLISION_RADIUS - 0.01;
+      ant.x = wallX - COLLISION_RADIUS;
       if (ant.vx > 0) ant.vx = 0; // Stop moving right
     }
   }
