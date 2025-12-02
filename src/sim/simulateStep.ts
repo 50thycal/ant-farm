@@ -68,38 +68,49 @@ function isAntOnGround(ant: Ant, world: any): boolean {
 }
 
 /**
+ * Generate weighted random offset favoring center (0)
+ * Uses triangular distribution for natural mound shape
+ * Returns integer in range [-maxOffset, maxOffset]
+ */
+function weightedRandomOffset(maxOffset: number): number {
+  // Triangular distribution: average of two uniform random variables
+  // Creates peak at center with linear falloff to edges
+  // Center (0) is 4x more likely than edges (±maxOffset)
+  const u1 = Math.random() * 2 - 1; // uniform [-1, 1]
+  const u2 = Math.random() * 2 - 1; // uniform [-1, 1]
+  const triangular = (u1 + u2) / 2; // triangular [-1, 1], peaked at 0
+
+  return Math.floor(triangular * maxOffset);
+}
+
+/**
  * Deposit dirt near ant's current location at surface
- * Spreads mound horizontally around tunnel entrance
+ * Builds a rounded mound around tunnel entrance using weighted distribution
  */
 function depositDirt(ant: Ant, world: any): void {
-  const antX = Math.floor(ant.x);
-  const searchRadius = 2; // Search within ±2 cells
+  const surfaceX = Math.floor(ant.x); // Where ant surfaced (tunnel entrance)
+  const MOUND_RADIUS = 5; // Spread mound ±5 tiles from entrance for natural ant hill
 
-  // Try to find air cell near ant's position
-  for (let dx = -searchRadius; dx <= searchRadius; dx++) {
-    const testX = antX + dx;
-    if (testX < 0 || testX >= WORLD_WIDTH) continue;
+  // Weighted random offset: favor center, allow spread to form rounded mound
+  // Triangular distribution makes center 4x more likely than edges
+  const offset = weightedRandomOffset(MOUND_RADIUS);
+  const depositX = surfaceX + offset;
 
-    // Find first air cell at or above surface at this X coordinate
-    let moundY = SOIL_START_Y - 1; // Start at row 3
-    while (moundY >= 0 && isSolidCell(world, testX, moundY)) {
-      moundY--; // Move up to build mound higher
-    }
-
-    // Found an air cell, place dirt there and return
-    if (moundY >= 0) {
-      setCellToDirt(world, testX, moundY);
-      return;
-    }
+  // Ensure within world bounds
+  if (depositX < 0 || depositX >= WORLD_WIDTH) {
+    return; // Can't place outside world
   }
 
-  // Fallback: if no air cell found nearby, place at ant's current X
-  let moundY = SOIL_START_Y - 1;
-  while (moundY >= 0 && isSolidCell(world, antX, moundY)) {
-    moundY--;
+  // Find the surface/mound height at this X coordinate
+  // Start just above original surface and scan upward through any existing mound
+  let depositY = SOIL_START_Y - 1; // Start at row 11 (just above surface at row 12)
+  while (depositY >= 0 && isSolidCell(world, depositX, depositY)) {
+    depositY--; // Move up to top of existing mound
   }
-  if (moundY >= 0) {
-    setCellToDirt(world, antX, moundY);
+
+  // Place dirt at the air cell above the mound
+  if (depositY >= 0) {
+    setCellToDirt(world, depositX, depositY);
   }
 }
 
