@@ -57,7 +57,9 @@ export function drawGameState(
   ctx.fillStyle = '#000000';
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
+  // TEMP: Disable world cell rendering to isolate particles
   // Draw world cells
+  /*
   for (let y = 0; y < world.height; y++) {
     for (let x = 0; x < world.width; x++) {
       const cellIndex = y * world.width + x;
@@ -76,6 +78,7 @@ export function drawGameState(
       ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
     }
   }
+  */
 
   // Draw ants
   for (const ant of gameState.ants) {
@@ -101,6 +104,11 @@ export function drawGameState(
   }
 
   // Draw dirt particles
+  // TEMP: Log particle count to verify they exist
+  if (gameState.particles.length > 0) {
+    console.log("Rendering", gameState.particles.length, "dirt particles");
+  }
+
   for (const particle of gameState.particles) {
     drawDirtParticle(ctx, particle);
   }
@@ -126,4 +134,14 @@ export function drawGameState(
       }
     }
   }
+
+  // TEMP TEST: Draw a bright magenta dot in center to verify rendering works
+  const testX = (world.width / 2) * CELL_SIZE;
+  const testY = (world.height / 2) * CELL_SIZE;
+  const testRadius = 4;
+
+  ctx.beginPath();
+  ctx.arc(testX, testY, testRadius, 0, Math.PI * 2);
+  ctx.fillStyle = "#ff00ff"; // bright magenta
+  ctx.fill();
 }
