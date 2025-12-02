@@ -72,13 +72,14 @@ function isAntOnGround(ant: Ant, world: any): boolean {
 /**
  * Find the best column to drop dirt near the ant
  * Chooses the lowest mound in a nearby range to create natural spreading
- * Avoids tunnel entrances to keep them clear
+ * Avoids tunnel entrances and verifies air cell availability
+ * Returns column X or null if no valid drop location found
  */
-function findBestDropColumn(world: any, antX: number): number {
+function findBestDropColumn(world: any, antX: number): number | null {
   const center = Math.floor(antX);
   const SEARCH_RADIUS = 4; // Look ±4 tiles from ant position
 
-  let bestX = center;
+  let bestX: number | null = null;
   let lowestHeight = Infinity;
 
   for (let dx = -SEARCH_RADIUS; dx <= SEARCH_RADIUS; dx++) {
@@ -93,37 +94,58 @@ function findBestDropColumn(world: any, antX: number): number {
     // Find the current mound height at this column
     const height = findMoundHeight(world, x);
 
-    // Choose the column with the lowest mound
+    // Verify there's actually an air cell available above the mound
+    const dropY = height - 1;
+    if (dropY < 0) continue; // Would be out of bounds
+
+    const targetCell = getCell(world, x, dropY);
+    if (!targetCell || targetCell.type !== 'air') continue; // Not available
+
+    // Choose the column with the lowest mound that has space
     if (height < lowestHeight) {
       lowestHeight = height;
       bestX = x;
     }
   }
 
-  return bestX;
+  return bestX; // null if no valid location found
 }
 
 /**
  * Deposit dirt at the best location near the ant
  * Ants actively choose low spots to create natural, spreading mounds
+ * Returns true if dirt was successfully placed, false otherwise
+ * STRICT CONSERVATION: Only returns true if an air cell was converted to dirt
  */
-function depositDirt(ant: Ant, world: any): void {
+function depositDirt(ant: Ant, world: any): boolean {
   // Find the best (lowest) nearby column to drop dirt
   const dropX = findBestDropColumn(world, ant.x);
+
+  // No valid location found
+  if (dropX === null) {
+    return false; // Keep carrying, try again next frame
+  }
 
   // Find the top of the mound at that column
   const moundTop = findMoundHeight(world, dropX);
 
-  // Place dirt one cell above the current mound top
+  // Calculate drop position (one cell above mound top)
   const dropY = moundTop - 1;
 
-  // Only place if within world bounds
-  if (dropY >= 0) {
-    const targetCell = getCell(world, dropX, dropY);
-    if (targetCell && targetCell.type === 'air') {
-      setCellToDirt(world, dropX, dropY);
-    }
+  // Verify drop position is valid
+  if (dropY < 0) {
+    return false; // Out of bounds at top of world
   }
+
+  // STRICT CHECK: Only place if target is AIR
+  const targetCell = getCell(world, dropX, dropY);
+  if (!targetCell || targetCell.type !== 'air') {
+    return false; // Not an air cell, cannot place here
+  }
+
+  // SUCCESS: Convert air to dirt
+  setCellToDirt(world, dropX, dropY);
+  return true; // Dirt successfully placed
 }
 
 /**
@@ -164,9 +186,13 @@ function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
 
     // Check if reached surface
     if (ant.y < SOIL_START_Y) {
-      // Deposit dirt near current location (spread mound horizontally)
-      depositDirt(ant, world);
-      ant.carrying = 'none';
+      // Try to deposit dirt near current location (spread mound horizontally)
+      // STRICT CONSERVATION: Only clear carrying if dirt was actually placed
+      const placed = depositDirt(ant, world);
+      if (placed) {
+        ant.carrying = 'none'; // Successfully dropped dirt
+      }
+      // If not placed, ant keeps carrying and will try again next frame
     }
   }
 
