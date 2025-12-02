@@ -3,8 +3,40 @@
  * Draws the game state to a 2D canvas context
  */
 
-import type { GameState } from '../sim/gameState';
+import type { GameState, Ant, DirtParticle } from '../sim/gameState';
 import { CELL_SIZE } from '../sim/gameState';
+
+// Size constants (relative to cell size)
+const ANT_RADIUS_FACTOR = 0.3; // Ant size relative to cell
+const DIRT_PARTICLE_RADIUS_FACTOR = ANT_RADIUS_FACTOR * 0.25; // Dirt is 1/4 ant size
+
+/**
+ * Draw a single ant
+ */
+function drawAnt(ctx: CanvasRenderingContext2D, ant: Ant): void {
+  const antPixelX = ant.x * CELL_SIZE;
+  const antPixelY = ant.y * CELL_SIZE;
+  const antRadius = CELL_SIZE * ANT_RADIUS_FACTOR;
+
+  ctx.beginPath();
+  ctx.arc(antPixelX, antPixelY, antRadius, 0, Math.PI * 2);
+  ctx.fillStyle = '#FF0000'; // red
+  ctx.fill();
+}
+
+/**
+ * Draw a single dirt particle
+ */
+function drawDirtParticle(ctx: CanvasRenderingContext2D, particle: DirtParticle): void {
+  const x = particle.x * CELL_SIZE;
+  const y = particle.y * CELL_SIZE;
+  const r = CELL_SIZE * DIRT_PARTICLE_RADIUS_FACTOR;
+
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = '#7a5a3a'; // brown dirt
+  ctx.fill();
+}
 
 /**
  * Draw the game state to the canvas
@@ -44,13 +76,8 @@ export function drawGameState(
   }
 
   // Draw ants
-  ctx.fillStyle = '#FF0000'; // red
   for (const ant of gameState.ants) {
-    const screenX = ant.x * CELL_SIZE;
-    const screenY = ant.y * CELL_SIZE;
-    ctx.beginPath();
-    ctx.arc(screenX, screenY, 4, 0, Math.PI * 2);
-    ctx.fill();
+    drawAnt(ctx, ant);
   }
 
   // Draw food items
@@ -72,11 +99,8 @@ export function drawGameState(
   }
 
   // Draw dirt particles
-  ctx.fillStyle = '#A0522D'; // sienna
   for (const particle of gameState.particles) {
-    const screenX = particle.x * CELL_SIZE;
-    const screenY = particle.y * CELL_SIZE;
-    ctx.fillRect(screenX - 1, screenY - 1, 2, 2);
+    drawDirtParticle(ctx, particle);
   }
 
   // Debug overlay: pheromone heatmap
