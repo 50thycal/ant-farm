@@ -100,3 +100,20 @@ export function columnHasTunnelBelowSurface(world: World, x: number): boolean {
   }
   return false; // No tunnel in this column
 }
+
+/**
+ * Find the height of the mound at a given x column
+ * Returns the Y coordinate of the highest dirt cell at or above surface
+ * Returns SOIL_START_Y if the column is flat (no mound)
+ */
+export function findMoundHeight(world: World, x: number): number {
+  // Scan from surface upward to find the top of any mound
+  for (let y = SOIL_START_Y - 1; y >= 0; y--) {
+    const cell = getCell(world, x, y);
+    if (!cell) continue;
+    if (cell.type === 'dirt') {
+      return y; // Found top of mound at this height
+    }
+  }
+  return SOIL_START_Y; // No mound, return base surface level
+}

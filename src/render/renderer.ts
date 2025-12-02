@@ -17,10 +17,19 @@ function drawAnt(ctx: CanvasRenderingContext2D, ant: Ant): void {
   const antPixelX = ant.x * CELL_SIZE;
   const antPixelY = ant.y * CELL_SIZE;
 
+  // Draw ant body
   ctx.beginPath();
   ctx.arc(antPixelX, antPixelY, ANT_RADIUS, 0, Math.PI * 2);
   ctx.fillStyle = '#FF0000'; // red
   ctx.fill();
+
+  // Draw dirt cargo if carrying
+  if (ant.carrying === 'dirt') {
+    ctx.fillStyle = '#8B4513'; // brown dirt
+    ctx.beginPath();
+    ctx.arc(antPixelX, antPixelY - ANT_RADIUS * 0.7, ANT_RADIUS * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
 /**

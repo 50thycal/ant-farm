@@ -12,6 +12,7 @@ import {
   isSolidCell,
   isInNest,
   columnHasTunnelBelowSurface,
+  findMoundHeight,
 } from './world';
 import {
   updatePheromones,
@@ -69,66 +70,60 @@ function isAntOnGround(ant: Ant, world: any): boolean {
 }
 
 /**
- * Generate weighted random offset favoring center (0)
- * Uses triangular distribution for natural mound shape
- * Returns integer in range [-maxOffset, maxOffset]
+ * Find the best column to drop dirt near the ant
+ * Chooses the lowest mound in a nearby range to create natural spreading
+ * Avoids tunnel entrances to keep them clear
  */
-function weightedRandomOffset(maxOffset: number): number {
-  // Triangular distribution: average of two uniform random variables
-  // Creates peak at center with linear falloff to edges
-  // Center (0) is 4x more likely than edges (±maxOffset)
-  const u1 = Math.random() * 2 - 1; // uniform [-1, 1]
-  const u2 = Math.random() * 2 - 1; // uniform [-1, 1]
-  const triangular = (u1 + u2) / 2; // triangular [-1, 1], peaked at 0
+function findBestDropColumn(world: any, antX: number): number {
+  const center = Math.floor(antX);
+  const SEARCH_RADIUS = 4; // Look ±4 tiles from ant position
 
-  return Math.floor(triangular * maxOffset);
-}
+  let bestX = center;
+  let lowestHeight = Infinity;
 
-/**
- * Deposit dirt near ant's current location at surface
- * Builds a rounded mound around tunnel entrance using weighted distribution
- * Avoids clogging tunnel entrances by skipping columns with active tunnels
- */
-function depositDirt(ant: Ant, world: any): void {
-  const surfaceX = Math.floor(ant.x); // Where ant surfaced (tunnel entrance)
-  const MOUND_RADIUS = 5; // Spread mound ±5 tiles from entrance for natural ant hill
-  const MAX_ATTEMPTS = 8; // Try multiple positions to avoid entrance
+  for (let dx = -SEARCH_RADIUS; dx <= SEARCH_RADIUS; dx++) {
+    const x = center + dx;
 
-  // Try to find a valid position that doesn't block a tunnel entrance
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    // Weighted random offset: favor center, allow spread to form rounded mound
-    // Triangular distribution makes center 4x more likely than edges
-    const offset = weightedRandomOffset(MOUND_RADIUS);
-    const depositX = surfaceX + offset;
+    // Skip out of bounds
+    if (x < 0 || x >= WORLD_WIDTH) continue;
 
-    // Ensure within world bounds
-    if (depositX < 0 || depositX >= WORLD_WIDTH) {
-      continue; // Try another position
-    }
+    // Don't drop dirt directly over a tunnel entrance
+    if (columnHasTunnelBelowSurface(world, x)) continue;
 
-    // Check if this column has a tunnel below - if so, avoid placing dirt here
-    // This prevents clogging the entrance
-    const hasTunnel = columnHasTunnelBelowSurface(world, depositX);
-    if (hasTunnel) {
-      continue; // Skip this position, try another
-    }
+    // Find the current mound height at this column
+    const height = findMoundHeight(world, x);
 
-    // Find the surface/mound height at this X coordinate
-    // Start just above original surface and scan upward through any existing mound
-    let depositY = SOIL_START_Y - 1; // Start at row 11 (just above surface at row 12)
-    while (depositY >= 0 && isSolidCell(world, depositX, depositY)) {
-      depositY--; // Move up to top of existing mound
-    }
-
-    // Place dirt at the air cell above the mound
-    if (depositY >= 0) {
-      setCellToDirt(world, depositX, depositY);
-      return; // Successfully placed dirt
+    // Choose the column with the lowest mound
+    if (height < lowestHeight) {
+      lowestHeight = height;
+      bestX = x;
     }
   }
 
-  // Fallback: if all attempts failed, just don't place the dirt
-  // (Better than clogging entrance or crashing)
+  return bestX;
+}
+
+/**
+ * Deposit dirt at the best location near the ant
+ * Ants actively choose low spots to create natural, spreading mounds
+ */
+function depositDirt(ant: Ant, world: any): void {
+  // Find the best (lowest) nearby column to drop dirt
+  const dropX = findBestDropColumn(world, ant.x);
+
+  // Find the top of the mound at that column
+  const moundTop = findMoundHeight(world, dropX);
+
+  // Place dirt one cell above the current mound top
+  const dropY = moundTop - 1;
+
+  // Only place if within world bounds
+  if (dropY >= 0) {
+    const targetCell = getCell(world, dropX, dropY);
+    if (targetCell && targetCell.type === 'air') {
+      setCellToDirt(world, dropX, dropY);
+    }
+  }
 }
 
 /**
@@ -157,23 +152,8 @@ function updateAnt(ant: Ant, gameState: GameState, dt: number): void {
     const digChance = DIG_CHANCE_PER_SECOND * dt;
     if (Math.random() < digChance) {
       setCellToAir(world, cellX, belowY);
-      ant.carrying = 'dirt'; // Pick up the dirt
-
-      // Spawn a few small dirt particles per dig
-      // Each particle is 1/4 ant size; 3 particles = denser visual
-      const PARTICLES_PER_CELL = 3;
-
-      for (let i = 0; i < PARTICLES_PER_CELL; i++) {
-        const jitterX = (Math.random() - 0.5) * 0.4; // Small offset within cell
-        const jitterY = (Math.random() - 0.5) * 0.4;
-
-        gameState.particles.push({
-          x: cellX + 0.5 + jitterX,
-          y: belowY + 0.5 + jitterY,
-          vx: 0,
-          vy: 0,
-        });
-      }
+      ant.carrying = 'dirt'; // Pick up the dirt (ant now carries this chunk)
+      // No particles spawned - ant carries the dirt to surface
     }
   }
 
