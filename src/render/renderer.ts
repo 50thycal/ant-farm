@@ -7,7 +7,7 @@ import type { GameState, Ant, DirtParticle } from '../sim/gameState';
 import { CELL_SIZE } from '../sim/gameState';
 
 // Size constants
-const ANT_RADIUS = 3; // Fixed 3px radius (6px diameter) - stands out against 4px tiles
+const ANT_RADIUS = 6; // Fixed 6px radius (12px diameter) - 2x larger for visibility
 // const DIRT_PARTICLE_RADIUS_FACTOR = ANT_RADIUS_FACTOR * 0.25; // Dirt is 1/4 ant size (commented for test)
 
 /**
