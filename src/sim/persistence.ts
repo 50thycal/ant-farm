@@ -6,7 +6,7 @@
 import type { GameState } from './gameState';
 import { createInitialGameState } from './gameState';
 
-const STORAGE_KEY = 'antfarm-001-state';
+const STORAGE_KEY = 'antfarm-001-state-v2'; // v2: Added state machine fields
 
 /**
  * Save game state to localStorage
@@ -77,6 +77,15 @@ export function clearSavedState(): void {
 function hydrateGameState(partial: any): GameState {
   const defaults = createInitialGameState();
 
+  // Migrate ants to ensure they have new state machine fields
+  const ants = (partial.ants || defaults.ants).map((ant: any) => ({
+    ...ant,
+    // Add new state machine fields if missing
+    mode: ant.mode || 'idleSurface',
+    hasDirt: ant.hasDirt !== undefined ? ant.hasDirt : false,
+    homeColumn: ant.homeColumn !== undefined ? ant.homeColumn : Math.floor(ant.x || 0),
+  }));
+
   return {
     meta: partial.meta || defaults.meta,
     world: partial.world || defaults.world,
@@ -84,7 +93,7 @@ function hydrateGameState(partial: any): GameState {
       ...defaults.colony,
       ...partial.colony,
     },
-    ants: partial.ants || defaults.ants,
+    ants,
     particles: partial.particles || [],
     foodItems: partial.foodItems || [],
     waterItems: partial.waterItems || [],
