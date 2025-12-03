@@ -186,7 +186,10 @@ function updateCarryingSurface(ant: Ant, world: any, dt: number): void {
       setCellToDirt(world, col, dropY);
       ant.hasDirt = false;
       ant.carrying = 'none';
-      ant.mode = 'idleSurface';
+      // Immediately return to digging at home column instead of wandering
+      ant.mode = 'diggingDown';
+      ant.x = ant.homeColumn + 0.5;
+      ant.y = SOIL_START_Y - 0.5;
     }
   }
 }
