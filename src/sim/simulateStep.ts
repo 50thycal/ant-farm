@@ -79,7 +79,7 @@ function findSurfaceDropY(world: any, x: number): number {
  * STATE: idleSurface - ant walks on surface, occasionally starts digging
  */
 function updateIdleSurface(ant: Ant, world: any, dt: number): void {
-  const SPEED = 4 * dt;
+  const SPEED = 20 * dt; // Increased from 4 for more visible movement
 
   // Simple left/right wobble on surface
   ant.x += (Math.random() < 0.5 ? -1 : 1) * SPEED;
@@ -91,7 +91,7 @@ function updateIdleSurface(ant: Ant, world: any, dt: number): void {
   const belowCell = getCell(world, col, SOIL_START_Y);
 
   const canDigHere = belowCell && (belowCell.type === 'dirt' || belowCell.type === 'stone');
-  const START_DIG_CHANCE = 0.005 * dt; // Low chance per frame
+  const START_DIG_CHANCE = 0.02; // 2% chance per frame (not scaled by dt)
 
   if (canDigHere && Math.random() < START_DIG_CHANCE) {
     ant.homeColumn = col;
@@ -104,7 +104,7 @@ function updateIdleSurface(ant: Ant, world: any, dt: number): void {
  * STATE: diggingDown - ant moves down shaft until hitting dirt, then digs
  */
 function updateDiggingDown(ant: Ant, world: any, dt: number): void {
-  const SPEED = 6 * dt;
+  const SPEED = 30 * dt; // Increased from 6 for faster digging
 
   // Stay centered in shaft
   ant.x = ant.homeColumn + 0.5;
@@ -139,7 +139,7 @@ function updateDiggingDown(ant: Ant, world: any, dt: number): void {
  * STATE: carryingUp - ant climbs straight up shaft with dirt
  */
 function updateCarryingUp(ant: Ant, _world: any, dt: number): void {
-  const CLIMB_SPEED = 6 * dt;
+  const CLIMB_SPEED = 30 * dt; // Increased from 6 for faster climbing
 
   // Stay centered in shaft
   ant.x = ant.homeColumn + 0.5;
@@ -158,7 +158,7 @@ function updateCarryingUp(ant: Ant, _world: any, dt: number): void {
  * STATE: carryingSurface - ant walks on surface with dirt, then drops it
  */
 function updateCarryingSurface(ant: Ant, world: any, dt: number): void {
-  const SPEED = 3 * dt;
+  const SPEED = 15 * dt; // Increased from 3
 
   // Stay at surface
   ant.y = SOIL_START_Y - 0.5;
@@ -170,7 +170,7 @@ function updateCarryingSurface(ant: Ant, world: any, dt: number): void {
   ant.x = clamp(ant.x, 0.5, WORLD_WIDTH - 0.5);
 
   // Random chance to drop dirt
-  const DROP_CHANCE = 0.03 * dt;
+  const DROP_CHANCE = 0.05; // 5% chance per frame (not scaled by dt)
 
   if (Math.random() < DROP_CHANCE) {
     const col = Math.floor(ant.x);
