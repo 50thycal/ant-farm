@@ -1,7 +1,7 @@
 // Sand physics simulation
 // Uses cellular automata rules for realistic sand behavior
 
-import { SandboxState, Cell, WORLD_WIDTH, WORLD_HEIGHT, Ant } from './types';
+import { SandboxState, Cell, WORLD_WIDTH, WORLD_HEIGHT, Ant, ANT_WALK_SPEED } from './types';
 
 // Check if a cell is empty (sand can move there)
 function isEmpty(grid: Cell[][], x: number, y: number): boolean {
@@ -101,12 +101,12 @@ function walkBehavior(grid: Cell[][], ant: Ant): void {
   const canWalkDown = isEmpty(grid, nextX, y) && isEmpty(grid, nextX, y + 1) && isSolid(grid, nextX, y + 2);
 
   if (canWalkForward) {
-    ant.x += ant.direction * 0.5;
+    ant.x += ant.direction * ANT_WALK_SPEED;
   } else if (canClimbUp) {
     ant.y -= 1;
-    ant.x += ant.direction * 0.5;
+    ant.x += ant.direction * ANT_WALK_SPEED;
   } else if (canWalkDown) {
-    ant.x += ant.direction * 0.5;
+    ant.x += ant.direction * ANT_WALK_SPEED;
     ant.y += 1;
   } else {
     // Can't move forward, check if we should dig or turn around

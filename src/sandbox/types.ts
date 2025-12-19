@@ -6,6 +6,9 @@ export const WORLD_HEIGHT = 120; // Grid cells tall
 export const CANVAS_WIDTH = WORLD_WIDTH * CELL_SIZE;
 export const CANVAS_HEIGHT = WORLD_HEIGHT * CELL_SIZE;
 
+// Ant behavior constants
+export const ANT_WALK_SPEED = 0.5; // Adjust this to change ant speed (try 0.1 to 1.0)
+
 // Cell types
 export enum Cell {
   Empty = 0,
