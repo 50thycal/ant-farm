@@ -3,6 +3,7 @@
 import {
   SandboxState,
   Cell,
+  Ant,
   CELL_SIZE,
   WORLD_WIDTH,
   WORLD_HEIGHT,
@@ -22,6 +23,8 @@ const SAND_COLORS = [
 const WALL_COLOR = '#4A3728'; // Dark brown wood
 const BACKGROUND_COLOR = '#1a1a2e'; // Dark blue background
 const GLASS_COLOR = 'rgba(200, 220, 255, 0.1)'; // Subtle glass tint
+const ANT_COLOR = '#2d1b0e'; // Dark brown ant
+const ANT_CARRY_COLOR = '#8B0000'; // Dark red when carrying
 
 // Pre-compute a color index for each cell position for consistent coloring
 function getSandColor(x: number, y: number): string {
@@ -30,9 +33,96 @@ function getSandColor(x: number, y: number): string {
   return SAND_COLORS[index];
 }
 
+// Draw a single ant
+function drawAnt(ctx: CanvasRenderingContext2D, ant: Ant): void {
+  const screenX = ant.x * CELL_SIZE;
+  const screenY = ant.y * CELL_SIZE;
+
+  // Ant body color depends on whether carrying sand
+  ctx.fillStyle = ant.carrySand ? ANT_CARRY_COLOR : ANT_COLOR;
+
+  // Draw ant body (3 segments)
+  const segmentSize = CELL_SIZE * 0.8;
+
+  // Abdomen (back)
+  ctx.beginPath();
+  ctx.ellipse(
+    screenX - ant.direction * segmentSize * 0.8,
+    screenY,
+    segmentSize * 0.6,
+    segmentSize * 0.5,
+    0, 0, Math.PI * 2
+  );
+  ctx.fill();
+
+  // Thorax (middle)
+  ctx.beginPath();
+  ctx.ellipse(
+    screenX,
+    screenY - segmentSize * 0.1,
+    segmentSize * 0.4,
+    segmentSize * 0.35,
+    0, 0, Math.PI * 2
+  );
+  ctx.fill();
+
+  // Head
+  ctx.beginPath();
+  ctx.ellipse(
+    screenX + ant.direction * segmentSize * 0.6,
+    screenY - segmentSize * 0.1,
+    segmentSize * 0.35,
+    segmentSize * 0.3,
+    0, 0, Math.PI * 2
+  );
+  ctx.fill();
+
+  // Legs (6 legs, 3 on each side)
+  ctx.strokeStyle = ANT_COLOR;
+  ctx.lineWidth = 1;
+  for (let i = -1; i <= 1; i++) {
+    const legX = screenX + i * segmentSize * 0.3;
+    // Left legs
+    ctx.beginPath();
+    ctx.moveTo(legX, screenY);
+    ctx.lineTo(legX - segmentSize * 0.4, screenY + segmentSize * 0.5);
+    ctx.stroke();
+    // Right legs
+    ctx.beginPath();
+    ctx.moveTo(legX, screenY);
+    ctx.lineTo(legX + segmentSize * 0.4, screenY + segmentSize * 0.5);
+    ctx.stroke();
+  }
+
+  // Antennae
+  const headX = screenX + ant.direction * segmentSize * 0.6;
+  const headY = screenY - segmentSize * 0.1;
+  ctx.beginPath();
+  ctx.moveTo(headX, headY - segmentSize * 0.2);
+  ctx.lineTo(headX + ant.direction * segmentSize * 0.4, headY - segmentSize * 0.5);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(headX, headY - segmentSize * 0.2);
+  ctx.lineTo(headX + ant.direction * segmentSize * 0.2, headY - segmentSize * 0.6);
+  ctx.stroke();
+
+  // Draw carried sand
+  if (ant.carrySand) {
+    ctx.fillStyle = SAND_COLORS[0];
+    ctx.beginPath();
+    ctx.arc(
+      headX + ant.direction * segmentSize * 0.3,
+      headY - segmentSize * 0.2,
+      segmentSize * 0.25,
+      0, Math.PI * 2
+    );
+    ctx.fill();
+  }
+}
+
 // Main render function
 export function render(ctx: CanvasRenderingContext2D, state: SandboxState): void {
-  const { grid } = state;
+  const { grid, ants } = state;
 
   // Clear with background
   ctx.fillStyle = BACKGROUND_COLOR;
@@ -56,6 +146,11 @@ export function render(ctx: CanvasRenderingContext2D, state: SandboxState): void
         ctx.fillRect(screenX, screenY, CELL_SIZE, CELL_SIZE);
       }
     }
+  }
+
+  // Draw ants
+  for (const ant of ants) {
+    drawAnt(ctx, ant);
   }
 
   // Draw glass container overlay (subtle)

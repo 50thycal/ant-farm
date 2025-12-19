@@ -13,10 +13,33 @@ export enum Cell {
   Wall = 2, // Container walls
 }
 
-// The sandbox state - just a grid
+// Ant state
+export interface Ant {
+  x: number;
+  y: number;
+  direction: 1 | -1; // 1 = right, -1 = left
+  carrySand: boolean;
+  state: 'walking' | 'digging' | 'dropping';
+  digCooldown: number;
+}
+
+// The sandbox state
 export interface SandboxState {
   grid: Cell[][];
+  ants: Ant[];
   tick: number;
+}
+
+// Create a new ant
+export function createAnt(x: number, y: number): Ant {
+  return {
+    x,
+    y,
+    direction: Math.random() > 0.5 ? 1 : -1,
+    carrySand: false,
+    state: 'walking',
+    digCooldown: 0,
+  };
 }
 
 // Create empty grid
@@ -55,6 +78,7 @@ export function createSandbox(): SandboxState {
 
   return {
     grid,
+    ants: [],
     tick: 0,
   };
 }
@@ -76,6 +100,11 @@ export function createFilledSandbox(): SandboxState {
       }
     }
   }
+
+  // Add an ant on top of the sand
+  const antX = Math.floor(WORLD_WIDTH / 2);
+  const antY = startY - 2; // Just above the sand
+  state.ants.push(createAnt(antX, antY));
 
   return state;
 }
