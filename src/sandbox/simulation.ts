@@ -3,9 +3,26 @@
 
 import { SandboxState, Cell, WORLD_WIDTH, WORLD_HEIGHT, Ant, ANT_WALK_SPEED } from './types';
 
+// Check if any ant occupies a given cell position
+function isAntAt(ants: Ant[], x: number, y: number): boolean {
+  for (const ant of ants) {
+    const antX = Math.floor(ant.x);
+    const antY = Math.floor(ant.y);
+    // Check if ant occupies this cell or adjacent cells (ant takes up ~1x1 space)
+    if (Math.abs(antX - x) <= 0 && Math.abs(antY - y) <= 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // Check if a cell is empty (sand can move there)
-function isEmpty(grid: Cell[][], x: number, y: number): boolean {
+function isEmpty(grid: Cell[][], x: number, y: number, ants?: Ant[]): boolean {
   if (x < 0 || x >= WORLD_WIDTH || y < 0 || y >= WORLD_HEIGHT) {
+    return false;
+  }
+  // Don't allow sand to move into cells occupied by ants
+  if (ants && isAntAt(ants, x, y)) {
     return false;
   }
   return grid[y][x] === Cell.Empty;
@@ -39,11 +56,11 @@ export function simulateStep(state: SandboxState): void {
   for (let y = WORLD_HEIGHT - 2; y >= 0; y--) {
     if (leftToRight) {
       for (let x = 0; x < WORLD_WIDTH; x++) {
-        updateCell(grid, x, y);
+        updateCell(grid, x, y, ants);
       }
     } else {
       for (let x = WORLD_WIDTH - 1; x >= 0; x--) {
-        updateCell(grid, x, y);
+        updateCell(grid, x, y, ants);
       }
     }
   }
@@ -194,11 +211,11 @@ function dropBehavior(grid: Cell[][], ant: Ant): void {
 }
 
 // Update a single sand particle
-function updateCell(grid: Cell[][], x: number, y: number): void {
+function updateCell(grid: Cell[][], x: number, y: number, ants: Ant[]): void {
   if (grid[y][x] !== Cell.Sand) return;
 
   // Try to fall straight down
-  if (isEmpty(grid, x, y + 1)) {
+  if (isEmpty(grid, x, y + 1, ants)) {
     grid[y][x] = Cell.Empty;
     grid[y + 1][x] = Cell.Sand;
     return;
@@ -209,19 +226,19 @@ function updateCell(grid: Cell[][], x: number, y: number): void {
 
   if (goLeft) {
     // Try left-down first, then right-down
-    if (isEmpty(grid, x - 1, y + 1) && isEmpty(grid, x - 1, y)) {
+    if (isEmpty(grid, x - 1, y + 1, ants) && isEmpty(grid, x - 1, y, ants)) {
       grid[y][x] = Cell.Empty;
       grid[y + 1][x - 1] = Cell.Sand;
-    } else if (isEmpty(grid, x + 1, y + 1) && isEmpty(grid, x + 1, y)) {
+    } else if (isEmpty(grid, x + 1, y + 1, ants) && isEmpty(grid, x + 1, y, ants)) {
       grid[y][x] = Cell.Empty;
       grid[y + 1][x + 1] = Cell.Sand;
     }
   } else {
     // Try right-down first, then left-down
-    if (isEmpty(grid, x + 1, y + 1) && isEmpty(grid, x + 1, y)) {
+    if (isEmpty(grid, x + 1, y + 1, ants) && isEmpty(grid, x + 1, y, ants)) {
       grid[y][x] = Cell.Empty;
       grid[y + 1][x + 1] = Cell.Sand;
-    } else if (isEmpty(grid, x - 1, y + 1) && isEmpty(grid, x - 1, y)) {
+    } else if (isEmpty(grid, x - 1, y + 1, ants) && isEmpty(grid, x - 1, y, ants)) {
       grid[y][x] = Cell.Empty;
       grid[y + 1][x - 1] = Cell.Sand;
     }
