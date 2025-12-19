@@ -66,52 +66,84 @@ export default function Sandbox() {
     };
   }, [isRunning]);
 
-  // Handle mouse interaction
-  const handleMouseAction = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (!stateRef.current) return;
+  // Get coordinates from mouse or touch event
+  const getCoords = useCallback((clientX: number, clientY: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
 
-      const canvas = canvasRef.current;
-      if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
 
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
+    const x = Math.floor(((clientX - rect.left) * scaleX) / CELL_SIZE);
+    const y = Math.floor(((clientY - rect.top) * scaleY) / CELL_SIZE);
 
-      const x = Math.floor(((e.clientX - rect.left) * scaleX) / CELL_SIZE);
-      const y = Math.floor(((e.clientY - rect.top) * scaleY) / CELL_SIZE);
+    return { x, y };
+  }, []);
 
-      if (tool === 'add') {
-        addSand(stateRef.current, x, y, 4);
-      } else {
-        removeSand(stateRef.current, x, y, 4);
-      }
-    },
-    [tool]
-  );
+  // Apply tool at coordinates
+  const applyTool = useCallback((x: number, y: number) => {
+    if (!stateRef.current) return;
 
-  // Handle mouse drag
-  const [isMouseDown, setIsMouseDown] = useState(false);
+    if (tool === 'add') {
+      addSand(stateRef.current, x, y, 4);
+    } else {
+      removeSand(stateRef.current, x, y, 4);
+    }
+  }, [tool]);
 
+  // Handle mouse/touch drag state
+  const [isPointerDown, setIsPointerDown] = useState(false);
+
+  // Mouse handlers
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
-      setIsMouseDown(true);
-      handleMouseAction(e);
+      setIsPointerDown(true);
+      const coords = getCoords(e.clientX, e.clientY);
+      if (coords) applyTool(coords.x, coords.y);
     },
-    [handleMouseAction]
+    [getCoords, applyTool]
   );
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (isMouseDown) {
-        handleMouseAction(e);
+      if (isPointerDown) {
+        const coords = getCoords(e.clientX, e.clientY);
+        if (coords) applyTool(coords.x, coords.y);
       }
     },
-    [isMouseDown, handleMouseAction]
+    [isPointerDown, getCoords, applyTool]
   );
 
   const handleMouseUp = useCallback(() => {
-    setIsMouseDown(false);
+    setIsPointerDown(false);
+  }, []);
+
+  // Touch handlers - prevent iOS selection menu
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent<HTMLCanvasElement>) => {
+      e.preventDefault();
+      setIsPointerDown(true);
+      const touch = e.touches[0];
+      const coords = getCoords(touch.clientX, touch.clientY);
+      if (coords) applyTool(coords.x, coords.y);
+    },
+    [getCoords, applyTool]
+  );
+
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent<HTMLCanvasElement>) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const coords = getCoords(touch.clientX, touch.clientY);
+      if (coords) applyTool(coords.x, coords.y);
+    },
+    [getCoords, applyTool]
+  );
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    setIsPointerDown(false);
   }, []);
 
   // Reset functions
@@ -135,8 +167,18 @@ export default function Sandbox() {
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        className="border-4 border-amber-800 rounded-lg shadow-xl cursor-crosshair"
-        style={{ maxWidth: '100%', height: 'auto' }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+        className="border-4 border-amber-800 rounded-lg shadow-xl cursor-crosshair select-none"
+        style={{
+          maxWidth: '100%',
+          height: 'auto',
+          touchAction: 'none',
+          WebkitTouchCallout: 'none',
+          WebkitUserSelect: 'none',
+        }}
       />
 
       {/* Controls */}
