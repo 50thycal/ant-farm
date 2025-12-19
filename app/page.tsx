@@ -2,7 +2,7 @@
 
 import { useAuthSession } from '@/hooks/useAuthSession'
 import { AuthCard } from '@/components/AuthCard'
-import AntFarm from '@/src/components/AntFarm'
+import Sandbox from '@/src/sandbox/Sandbox'
 import { APP_CONFIG } from './config'
 
 export default function Home() {
@@ -18,14 +18,13 @@ export default function Home() {
 
   if (!isInMiniApp) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <div className="max-w-md w-full text-center">
+      <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-amber-50">
+        <div className="w-full text-center">
           <h1 className="text-2xl font-bold mb-2">{APP_CONFIG.title}</h1>
           <p className="text-gray-600 mb-4">{APP_CONFIG.description}</p>
           <AuthCard />
           <div className="mt-6">
-            <p className="text-sm text-gray-500 mb-4">Preview the game:</p>
-            <AntFarm />
+            <Sandbox />
           </div>
         </div>
       </div>
@@ -61,9 +60,9 @@ export default function Home() {
         )}
       </header>
 
-      {/* Game */}
+      {/* Sandbox */}
       <main className="flex-1 flex items-center justify-center">
-        <AntFarm />
+        <Sandbox />
       </main>
     </div>
   )
