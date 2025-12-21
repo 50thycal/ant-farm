@@ -31,6 +31,7 @@ export interface SandboxState {
   grid: Cell[][];
   ants: Ant[];
   tick: number;
+  activeSand: Set<string>; // Track which sand particles are active (can move)
 }
 
 // Create a new ant
@@ -83,6 +84,7 @@ export function createSandbox(): SandboxState {
     grid,
     ants: [],
     tick: 0,
+    activeSand: new Set(),
   };
 }
 
@@ -100,6 +102,8 @@ export function createFilledSandbox(): SandboxState {
       // Random fill to create interesting initial settling
       if (Math.random() < 0.85) {
         state.grid[y][x] = Cell.Sand;
+        // Mark initial sand as active so it can settle
+        state.activeSand.add(`${x},${y}`);
       }
     }
   }
