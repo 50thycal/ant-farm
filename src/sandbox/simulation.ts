@@ -85,11 +85,15 @@ function updateAnt(state: SandboxState, ant: Ant): void {
   // Decrease cooldowns
   if (ant.digCooldown > 0) ant.digCooldown--;
 
-  // Check if ant is on ground (has solid below)
+  // Check if ant is attached to any surface (ground, wall, or ceiling)
   const onGround = isSolid(grid, x, y + 1);
+  const onCeiling = isSolid(grid, x, y - 1);
+  const onWallLeft = isSolid(grid, x - 1, y);
+  const onWallRight = isSolid(grid, x + 1, y);
+  const isAttached = onGround || onCeiling || onWallLeft || onWallRight;
 
-  // Apply gravity if not on ground
-  if (!onGround) {
+  // Apply gravity only if not attached to any surface
+  if (!isAttached) {
     ant.y += 0.5; // Fall
     return; // Don't do anything else while falling
   }
@@ -114,25 +118,60 @@ function walkBehavior(grid: Cell[][], ant: Ant): void {
   const y = Math.floor(ant.y);
   const nextX = x + ant.direction;
 
-  // Check if we can walk forward
+  // Priority 1: Try to walk forward on floor
   const canWalkForward = isEmpty(grid, nextX, y) && isSolid(grid, nextX, y + 1);
 
-  // Check if we can climb up (wall in front, empty above)
-  const canClimbUp = isSolid(grid, nextX, y) && isEmpty(grid, x, y - 1) && isEmpty(grid, nextX, y - 1);
-
-  // Check if we can walk down a slope
+  // Priority 2: Try to walk down a slope
   const canWalkDown = isEmpty(grid, nextX, y) && isEmpty(grid, nextX, y + 1) && isSolid(grid, nextX, y + 2);
 
+  // Priority 3: Try to climb up (check multiple heights)
+  let canClimb = false;
+  let climbHeight = 0;
+  const maxClimbHeight = 10; // Ant can climb up to 10 blocks
+
+  for (let h = 1; h <= maxClimbHeight; h++) {
+    const climbY = y - h;
+    // Check if we can climb to this height: need solid wall and empty space at target
+    if (isEmpty(grid, x, climbY) && isEmpty(grid, nextX, climbY) && isSolid(grid, nextX, y)) {
+      // Found a climbable height
+      canClimb = true;
+      climbHeight = h;
+      break;
+    }
+    // Stop if we hit ceiling
+    if (isSolid(grid, x, climbY)) {
+      break;
+    }
+  }
+
+  // Priority 4: Try to walk on ceiling (solid above, empty below)
+  const canWalkCeiling = isEmpty(grid, nextX, y) && isSolid(grid, nextX, y - 1) && !isSolid(grid, x, y - 1);
+
+  // Priority 5: Try to walk on wall (solid to the side)
+  const canWalkWall = isEmpty(grid, x, y - 1) && isSolid(grid, nextX, y);
+
+  // Execute movement in priority order
   if (canWalkForward) {
-    ant.x += ant.direction * ANT_WALK_SPEED;
-  } else if (canClimbUp) {
-    ant.y -= 1;
     ant.x += ant.direction * ANT_WALK_SPEED;
   } else if (canWalkDown) {
     ant.x += ant.direction * ANT_WALK_SPEED;
     ant.y += 1;
+  } else if (canClimb) {
+    // Climb up the wall
+    ant.y -= 1;
+    // Also move forward slightly if we're at the top
+    if (climbHeight === 1 || isEmpty(grid, nextX, y - climbHeight)) {
+      ant.x += ant.direction * ANT_WALK_SPEED * 0.5;
+    }
+  } else if (canWalkCeiling) {
+    // Walk along ceiling
+    ant.x += ant.direction * ANT_WALK_SPEED;
+    ant.y -= 1;
+  } else if (canWalkWall) {
+    // Walk up the wall
+    ant.y -= 1;
   } else {
-    // Can't move forward, check if we should dig or turn around
+    // Can't move forward in any way - check if we should dig or turn around
     if (!ant.carrySand && isDiggable(grid, nextX, y) && Math.random() < 0.3) {
       ant.state = 'digging';
     } else {
