@@ -3,6 +3,11 @@
 
 import { SandboxState, Cell, WORLD_WIDTH, WORLD_HEIGHT, Ant, ANT_WALK_SPEED } from './types';
 
+// Helper to create a key for tracking sand positions
+function sandKey(x: number, y: number): string {
+  return `${x},${y}`;
+}
+
 // Check if any ant occupies a given cell position
 function isAntAt(ants: Ant[], x: number, y: number): boolean {
   for (const ant of ants) {
@@ -46,33 +51,34 @@ function isDiggable(grid: Cell[][], x: number, y: number): boolean {
 
 // Simulate one step of sand physics
 export function simulateStep(state: SandboxState): void {
-  const { grid, ants } = state;
+  const { grid, ants, activeSand } = state;
   state.tick++;
 
-  // Process from bottom to top, so falling sand doesn't get processed twice
-  // Alternate left-right sweep direction each frame for more natural flow
-  const leftToRight = state.tick % 2 === 0;
+  // Only process active sand particles (those that might still be moving)
+  // Convert to array to avoid modifying set during iteration
+  const activeCells = Array.from(activeSand);
 
-  for (let y = WORLD_HEIGHT - 2; y >= 0; y--) {
-    if (leftToRight) {
-      for (let x = 0; x < WORLD_WIDTH; x++) {
-        updateCell(grid, x, y, ants);
-      }
-    } else {
-      for (let x = WORLD_WIDTH - 1; x >= 0; x--) {
-        updateCell(grid, x, y, ants);
-      }
+  for (const key of activeCells) {
+    const [x, y] = key.split(',').map(Number);
+
+    // Skip if this cell is no longer sand (may have been moved already this frame)
+    if (grid[y][x] !== Cell.Sand) {
+      activeSand.delete(key);
+      continue;
     }
+
+    updateCell(state, x, y, ants);
   }
 
   // Update ants
   for (const ant of ants) {
-    updateAnt(grid, ant);
+    updateAnt(state, ant);
   }
 }
 
 // Update ant position and behavior
-function updateAnt(grid: Cell[][], ant: Ant): void {
+function updateAnt(state: SandboxState, ant: Ant): void {
+  const { grid } = state;
   const x = Math.floor(ant.x);
   const y = Math.floor(ant.y);
 
@@ -94,10 +100,10 @@ function updateAnt(grid: Cell[][], ant: Ant): void {
       walkBehavior(grid, ant);
       break;
     case 'digging':
-      digBehavior(grid, ant);
+      digBehavior(state, ant);
       break;
     case 'dropping':
-      dropBehavior(grid, ant);
+      dropBehavior(state, ant);
       break;
   }
 }
@@ -147,9 +153,10 @@ function walkBehavior(grid: Cell[][], ant: Ant): void {
 }
 
 // Digging behavior - pick up sand
-function digBehavior(grid: Cell[][], ant: Ant): void {
+function digBehavior(state: SandboxState, ant: Ant): void {
   if (ant.digCooldown > 0) return;
 
+  const { grid, activeSand } = state;
   const x = Math.floor(ant.x);
   const y = Math.floor(ant.y);
 
@@ -166,6 +173,7 @@ function digBehavior(grid: Cell[][], ant: Ant): void {
 
     if (isDiggable(grid, digX, digY)) {
       grid[digY][digX] = Cell.Empty;
+      activeSand.delete(sandKey(digX, digY));
       ant.carrySand = true;
       ant.digCooldown = 10;
       ant.state = 'walking';
@@ -178,12 +186,13 @@ function digBehavior(grid: Cell[][], ant: Ant): void {
 }
 
 // Dropping behavior - place sand
-function dropBehavior(grid: Cell[][], ant: Ant): void {
+function dropBehavior(state: SandboxState, ant: Ant): void {
   if (!ant.carrySand) {
     ant.state = 'walking';
     return;
   }
 
+  const { grid, activeSand } = state;
   const x = Math.floor(ant.x);
   const y = Math.floor(ant.y);
 
@@ -200,6 +209,7 @@ function dropBehavior(grid: Cell[][], ant: Ant): void {
 
     if (isEmpty(grid, dropX, dropY)) {
       grid[dropY][dropX] = Cell.Sand;
+      activeSand.add(sandKey(dropX, dropY)); // Mark dropped sand as active
       ant.carrySand = false;
       ant.state = 'walking';
       return;
@@ -211,13 +221,19 @@ function dropBehavior(grid: Cell[][], ant: Ant): void {
 }
 
 // Update a single sand particle
-function updateCell(grid: Cell[][], x: number, y: number, ants: Ant[]): void {
+function updateCell(state: SandboxState, x: number, y: number, ants: Ant[]): void {
+  const { grid, activeSand } = state;
   if (grid[y][x] !== Cell.Sand) return;
+
+  const currentKey = sandKey(x, y);
+  let moved = false;
 
   // Try to fall straight down
   if (isEmpty(grid, x, y + 1, ants)) {
     grid[y][x] = Cell.Empty;
     grid[y + 1][x] = Cell.Sand;
+    activeSand.delete(currentKey);
+    activeSand.add(sandKey(x, y + 1));
     return;
   }
 
@@ -229,25 +245,42 @@ function updateCell(grid: Cell[][], x: number, y: number, ants: Ant[]): void {
     if (isEmpty(grid, x - 1, y + 1, ants) && isEmpty(grid, x - 1, y, ants)) {
       grid[y][x] = Cell.Empty;
       grid[y + 1][x - 1] = Cell.Sand;
+      activeSand.delete(currentKey);
+      activeSand.add(sandKey(x - 1, y + 1));
+      moved = true;
     } else if (isEmpty(grid, x + 1, y + 1, ants) && isEmpty(grid, x + 1, y, ants)) {
       grid[y][x] = Cell.Empty;
       grid[y + 1][x + 1] = Cell.Sand;
+      activeSand.delete(currentKey);
+      activeSand.add(sandKey(x + 1, y + 1));
+      moved = true;
     }
   } else {
     // Try right-down first, then left-down
     if (isEmpty(grid, x + 1, y + 1, ants) && isEmpty(grid, x + 1, y, ants)) {
       grid[y][x] = Cell.Empty;
       grid[y + 1][x + 1] = Cell.Sand;
+      activeSand.delete(currentKey);
+      activeSand.add(sandKey(x + 1, y + 1));
+      moved = true;
     } else if (isEmpty(grid, x - 1, y + 1, ants) && isEmpty(grid, x - 1, y, ants)) {
       grid[y][x] = Cell.Empty;
       grid[y + 1][x - 1] = Cell.Sand;
+      activeSand.delete(currentKey);
+      activeSand.add(sandKey(x - 1, y + 1));
+      moved = true;
     }
+  }
+
+  // If sand didn't move, it has settled - remove from active set
+  if (!moved) {
+    activeSand.delete(currentKey);
   }
 }
 
 // Add sand at a position (for user interaction)
 export function addSand(state: SandboxState, x: number, y: number, radius: number = 3): void {
-  const { grid } = state;
+  const { grid, activeSand } = state;
 
   for (let dy = -radius; dy <= radius; dy++) {
     for (let dx = -radius; dx <= radius; dx++) {
@@ -263,6 +296,8 @@ export function addSand(state: SandboxState, x: number, y: number, radius: numbe
       // Only add to empty cells
       if (grid[py][px] === Cell.Empty) {
         grid[py][px] = Cell.Sand;
+        // Mark new sand as active so it can fall
+        activeSand.add(sandKey(px, py));
       }
     }
   }
@@ -270,7 +305,7 @@ export function addSand(state: SandboxState, x: number, y: number, radius: numbe
 
 // Remove sand at a position
 export function removeSand(state: SandboxState, x: number, y: number, radius: number = 3): void {
-  const { grid } = state;
+  const { grid, activeSand } = state;
 
   for (let dy = -radius; dy <= radius; dy++) {
     for (let dx = -radius; dx <= radius; dx++) {
@@ -282,6 +317,7 @@ export function removeSand(state: SandboxState, x: number, y: number, radius: nu
 
       if (grid[py][px] === Cell.Sand) {
         grid[py][px] = Cell.Empty;
+        activeSand.delete(sandKey(px, py));
       }
     }
   }
