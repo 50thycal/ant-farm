@@ -122,7 +122,7 @@ function drawAnt(ctx: CanvasRenderingContext2D, ant: Ant): void {
 
 // Main render function
 export function render(ctx: CanvasRenderingContext2D, state: SandboxState): void {
-  const { grid, ants } = state;
+  const { grid, ants, marker } = state;
 
   // Clear with background
   ctx.fillStyle = BACKGROUND_COLOR;
@@ -146,6 +146,35 @@ export function render(ctx: CanvasRenderingContext2D, state: SandboxState): void
         ctx.fillRect(screenX, screenY, CELL_SIZE, CELL_SIZE);
       }
     }
+  }
+
+  // Draw marker if it exists
+  if (marker) {
+    const markerX = marker.x * CELL_SIZE;
+    const markerY = marker.y * CELL_SIZE;
+    const markerSize = CELL_SIZE * 3;
+
+    // Draw pulsing marker (target/crosshair style)
+    ctx.strokeStyle = '#00FF00'; // Bright green
+    ctx.lineWidth = 2;
+
+    // Outer circle
+    ctx.beginPath();
+    ctx.arc(markerX + CELL_SIZE / 2, markerY + CELL_SIZE / 2, markerSize, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Inner circle
+    ctx.beginPath();
+    ctx.arc(markerX + CELL_SIZE / 2, markerY + CELL_SIZE / 2, markerSize / 2, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Crosshair
+    ctx.beginPath();
+    ctx.moveTo(markerX - markerSize, markerY + CELL_SIZE / 2);
+    ctx.lineTo(markerX + markerSize + CELL_SIZE, markerY + CELL_SIZE / 2);
+    ctx.moveTo(markerX + CELL_SIZE / 2, markerY - markerSize);
+    ctx.lineTo(markerX + CELL_SIZE / 2, markerY + markerSize + CELL_SIZE);
+    ctx.stroke();
   }
 
   // Draw ants

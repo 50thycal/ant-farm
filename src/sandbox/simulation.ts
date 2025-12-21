@@ -101,7 +101,7 @@ function updateAnt(state: SandboxState, ant: Ant): void {
   // Ant behavior based on state
   switch (ant.state) {
     case 'walking':
-      walkBehavior(grid, ant);
+      walkBehavior(grid, ant, state);
       break;
     case 'digging':
       digBehavior(state, ant);
@@ -113,9 +113,32 @@ function updateAnt(state: SandboxState, ant: Ant): void {
 }
 
 // Walking behavior - move around, sometimes dig
-function walkBehavior(grid: Cell[][], ant: Ant): void {
+function walkBehavior(grid: Cell[][], ant: Ant, state?: SandboxState): void {
   const x = Math.floor(ant.x);
   const y = Math.floor(ant.y);
+
+  // If there's a marker, try to move toward it
+  if (state?.marker) {
+    const marker = state.marker;
+    const dx = marker.x - x;
+    const dy = marker.y - y;
+
+    // Prefer direction toward marker if we're not already going that way
+    if (Math.abs(dx) > 2) { // Only change direction if marker is not too close
+      const preferredDirection = dx > 0 ? 1 : -1;
+      if (ant.direction !== preferredDirection) {
+        // Check if we can move in the preferred direction
+        const canMoveTowardMarker =
+          isEmpty(grid, x + preferredDirection, y) ||
+          isSolid(grid, x + preferredDirection, y); // Can climb
+
+        if (canMoveTowardMarker || Math.random() < 0.3) {
+          ant.direction = preferredDirection as 1 | -1;
+        }
+      }
+    }
+  }
+
   const nextX = x + ant.direction;
 
   // Priority 1: Try to walk forward on floor
