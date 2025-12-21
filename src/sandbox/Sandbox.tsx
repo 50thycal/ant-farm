@@ -17,7 +17,7 @@ export default function Sandbox() {
   const stateRef = useRef<SandboxState | null>(null);
   const animationRef = useRef<number>(0);
   const [isRunning, setIsRunning] = useState(true);
-  const [tool, setTool] = useState<'add' | 'remove'>('add');
+  const [tool, setTool] = useState<'add' | 'remove' | 'marker'>('add');
 
   // Initialize
   useEffect(() => {
@@ -87,8 +87,22 @@ export default function Sandbox() {
 
     if (tool === 'add') {
       addSand(stateRef.current, x, y, 4);
-    } else {
+    } else if (tool === 'remove') {
       removeSand(stateRef.current, x, y, 4);
+    } else if (tool === 'marker') {
+      // Toggle marker: if clicking near existing marker, remove it; otherwise place new one
+      const state = stateRef.current;
+      if (state.marker) {
+        const dx = Math.abs(state.marker.x - x);
+        const dy = Math.abs(state.marker.y - y);
+        if (dx < 5 && dy < 5) {
+          // Close to existing marker, remove it
+          state.marker = null;
+          return;
+        }
+      }
+      // Place new marker
+      state.marker = { x, y };
     }
   }, [tool]);
 
@@ -119,30 +133,35 @@ export default function Sandbox() {
     setIsPointerDown(false);
   }, []);
 
-  // Touch handlers - prevent iOS selection menu
+  // Touch handlers - allow scrolling, only prevent when actively using sand tools
   const handleTouchStart = useCallback(
     (e: React.TouchEvent<HTMLCanvasElement>) => {
-      e.preventDefault();
+      // Only preventDefault for add/remove tools to allow scrolling with marker tool
+      if (tool === 'add' || tool === 'remove') {
+        e.preventDefault();
+      }
       setIsPointerDown(true);
       const touch = e.touches[0];
       const coords = getCoords(touch.clientX, touch.clientY);
       if (coords) applyTool(coords.x, coords.y);
     },
-    [getCoords, applyTool]
+    [getCoords, applyTool, tool]
   );
 
   const handleTouchMove = useCallback(
     (e: React.TouchEvent<HTMLCanvasElement>) => {
-      e.preventDefault();
-      const touch = e.touches[0];
-      const coords = getCoords(touch.clientX, touch.clientY);
-      if (coords) applyTool(coords.x, coords.y);
+      // Only preventDefault when actively dragging with sand tools
+      if (isPointerDown && (tool === 'add' || tool === 'remove')) {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const coords = getCoords(touch.clientX, touch.clientY);
+        if (coords) applyTool(coords.x, coords.y);
+      }
     },
-    [getCoords, applyTool]
+    [isPointerDown, getCoords, applyTool, tool]
   );
 
-  const handleTouchEnd = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
+  const handleTouchEnd = useCallback(() => {
     setIsPointerDown(false);
   }, []);
 
@@ -175,7 +194,6 @@ export default function Sandbox() {
         style={{
           maxWidth: '100%',
           height: 'auto',
-          touchAction: 'none',
           WebkitTouchCallout: 'none',
           WebkitUserSelect: 'none',
         }}
@@ -200,6 +218,14 @@ export default function Sandbox() {
             }`}
           >
             - Remove
+          </button>
+          <button
+            onClick={() => setTool('marker')}
+            className={`px-3 py-2 rounded transition ${
+              tool === 'marker' ? 'bg-green-500 text-white' : 'bg-white hover:bg-gray-50'
+            }`}
+          >
+            🎯 Marker
           </button>
         </div>
 
@@ -233,7 +259,7 @@ export default function Sandbox() {
       </div>
 
       <p className="text-sm text-gray-500">
-        Click and drag to add or remove sand. Watch it flow!
+        Click and drag to add or remove sand. Use marker tool to guide the ant! 🎯
       </p>
     </div>
   );

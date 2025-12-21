@@ -32,6 +32,7 @@ export interface SandboxState {
   ants: Ant[];
   tick: number;
   activeSand: Set<string>; // Track which sand particles are active (can move)
+  marker: { x: number; y: number } | null; // Goal marker for ant navigation
 }
 
 // Create a new ant
@@ -85,6 +86,7 @@ export function createSandbox(): SandboxState {
     ants: [],
     tick: 0,
     activeSand: new Set(),
+    marker: null,
   };
 }
 
