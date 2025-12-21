@@ -272,9 +272,19 @@ function updateCell(state: SandboxState, x: number, y: number, ants: Ant[]): voi
     }
   }
 
-  // If sand didn't move, it has settled - remove from active set
+  // Only settle if we didn't move AND there's no active sand nearby
+  // Check if sand below or diagonally below is still active
   if (!moved) {
-    activeSand.delete(currentKey);
+    const hasActiveSandBelow =
+      activeSand.has(sandKey(x, y + 1)) ||
+      activeSand.has(sandKey(x - 1, y + 1)) ||
+      activeSand.has(sandKey(x + 1, y + 1));
+
+    // If there's active sand below, stay active (it might create space)
+    // Otherwise, we've settled
+    if (!hasActiveSandBelow) {
+      activeSand.delete(currentKey);
+    }
   }
 }
 
