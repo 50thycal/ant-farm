@@ -23,8 +23,8 @@ const SAND_COLORS = [
 const WALL_COLOR = '#4A3728'; // Dark brown wood
 const BACKGROUND_COLOR = '#1a1a2e'; // Dark blue background
 const GLASS_COLOR = 'rgba(200, 220, 255, 0.1)'; // Subtle glass tint
-const ANT_COLOR = '#2d1b0e'; // Dark brown ant
-const ANT_CARRY_COLOR = '#8B0000'; // Dark red when carrying
+const ANT_COLOR = '#D2691E'; // Chocolate/orange-brown ant (visible!)
+const ANT_CARRY_COLOR = '#FF4500'; // Orange-red when carrying sand
 
 // Pre-compute a color index for each cell position for consistent coloring
 function getSandColor(x: number, y: number): string {
