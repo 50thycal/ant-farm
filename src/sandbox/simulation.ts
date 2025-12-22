@@ -121,7 +121,7 @@ function walkBehavior(grid: Cell[][], ant: Ant, state?: SandboxState): void {
   if (state?.marker) {
     const marker = state.marker;
     const dx = marker.x - x;
-    const dy = marker.y - y;
+    // const dy = marker.y - y; // TODO: Use for vertical pathfinding
 
     // Prefer direction toward marker if we're not already going that way
     if (Math.abs(dx) > 2) { // Only change direction if marker is not too close
